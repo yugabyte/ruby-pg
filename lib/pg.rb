@@ -113,6 +113,7 @@ module PG
 	require 'pg/connection'
 	require 'pg/result'
 	require 'pg/tuple'
+	require 'pg/load_balance_service'
 	autoload :VERSION, 'pg/version'
 
 

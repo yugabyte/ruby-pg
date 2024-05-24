@@ -54,6 +54,7 @@ lib/pg/text_decoder.rb
 lib/pg/text_encoder.rb
 lib/pg/tuple.rb
 lib/pg/type_map_by_column.rb
+lib/pg/load_balance_service.rb
 spec/data/expected_trace.out
 spec/data/random_binary_data
 spec/helpers.rb

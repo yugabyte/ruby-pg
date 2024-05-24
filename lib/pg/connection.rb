@@ -4,6 +4,7 @@
 require 'pg' unless defined?( PG )
 require 'io/wait' unless ::IO.public_instance_methods(false).include?(:wait_readable)
 require 'socket'
+require_relative 'load_balance_service'
 
 # The PostgreSQL connection class. The interface for this class is based on
 # {libpq}[http://www.postgresql.org/docs/current/libpq.html], the C
@@ -33,7 +34,8 @@ class PG::Connection
 	CONNECT_ARGUMENT_ORDER = %w[host port options tty dbname user password load_balance topology_keys].freeze
 	private_constant :CONNECT_ARGUMENT_ORDER
 	@load_balance = false
-	@topology_keys = nil
+	# @topology_keys = nil
+	@placements_info = Hash.new
 	@yb_servers_refresh_interval = 300
 	@fallback_to_topology_keys_only = false
 	@failed_host_reconnect_delay_secs = 5
@@ -73,9 +75,11 @@ class PG::Connection
 	# The method adds the option "fallback_application_name" if it isn't already set.
 	# It returns a connection string with "key=value" pairs.
 	def self.parse_connect_args( *args )
+		log_msg(Thread.current.to_s + "] parse_connect_args() args.length: " + args.length.to_s + ", " + args.to_s)
+		# log_msg("parse_connect_args() args.last: " + args.last.to_s)
+		# log_msg("parse_connect_args() args.last is a hash?: " + args.last.is_a?( Hash ).to_s)
 		hash_arg = args.last.is_a?( Hash ) ? args.pop.transform_keys(&:to_sym) : {}
-		puts "parse_connect_args() args.length: " + args.size.to_s + ", " + args.to_s
-		puts "parse_connect_args() hash_arg: " + hash_arg.class.to_s + ", " + hash_arg.to_s
+		log_msg("parse_connect_args() hash_arg: " + hash_arg.class.to_s + ", " + hash_arg.to_s)
 		iopts = {}
 
 		if args.length == 1
@@ -100,32 +104,7 @@ class PG::Connection
 			iopts.delete(:tty) # ignore obsolete tty parameter
 		end
 
-		lb = hash_arg.delete(:load_balance)
-		tk = hash_arg.delete(:topology_keys)
-		ri = hash_arg.delete(:yb_servers_refresh_interval)
-		ttl = hash_arg.delete(:failed_host_reconnect_delay_secs)
-		fb = hash_arg.delete(:fallback_to_topology_keys_only)
-
-		@load_balance = lb.to_s.downcase == "true" if lb
-		if tk
-			tk_parts = tk.split('.', -1)
-			if tk_parts.length != 3
-				raise ArgumentError "Invalid value specified for topology_keys: " + tk
-			end
-			@topology_keys = tk
-		end
-		@yb_servers_refresh_interval = ri.to_i if ri
-		if @yb_servers_refresh_interval < 0 || @yb_servers_refresh_interval > 600
-			puts "Invalid value for yb_servers_refresh_interval. Using the default value (300 seconds) instead."
-			@yb_servers_refresh_interval = 300
-		end
-		@failed_host_reconnect_delay_secs = ttl.to_i if ttl
-		if @failed_host_reconnect_delay_secs < 0 || @failed_host_reconnect_delay_secs > 60
-			puts "Invalid value for failed_host_reconnect_delay_secs. Using the default value (5 seconds) instead."
-			@failed_host_reconnect_delay_secs = 5
-		end
-		@fallback_to_topology_keys_only = fb.to_s.downcase == "true" if fb
-		puts "parse_connect_args() LB properties: lb=#{@load_balance}, tk=#{@topology_keys}, refresh=#{@yb_servers_refresh_interval}, delay=#{@failed_host_reconnect_delay_secs}, fallback=#{@fallback_to_topology_keys_only}"
+		parse_connect_lb_args hash_arg
 
 		iopts.merge!( hash_arg )
 
@@ -134,6 +113,86 @@ class PG::Connection
 		end
 
 		return connect_hash_to_string(iopts)
+	end
+
+	def self.parse_connect_lb_args(hash_arg)
+		lb = hash_arg.delete(:load_balance)
+		tk = hash_arg.delete(:topology_keys)
+		ri = hash_arg.delete(:yb_servers_refresh_interval)
+		ttl = hash_arg.delete(:failed_host_reconnect_delay_secs)
+		fb = hash_arg.delete(:fallback_to_topology_keys_only)
+
+		if lb && lb.to_s.downcase == "true"
+			@load_balance = true
+			if tk
+				placements = Set.new
+				tk_parts = tk.split(',', -1)
+				tk_parts.each {
+					|tk_part|
+					single_tk = tk_part.split('.', -1)
+					if single_tk.length != 3
+						raise ArgumentError, "Invalid value #{tk_part} specified for topology_keys: " + tk
+					end
+					pref_part = tk_part.split(':', -1)
+					if pref_part.length > 2
+						raise ArgumentError, "Invalid preference value #{pref_part} specified for topology_keys: " + tk
+					end
+					preference_value = 1
+					if pref_part.length == 2
+						preference = pref_part[1]
+						if preference == ""
+							raise ArgumentError, "No preference value specified for topology_keys: " + tk
+						end
+						begin
+							preference_value = Integer(preference).to_i
+						rescue
+							raise ArgumentError, "Invalid preference value #{preference} for topology_keys: " + tk
+						ensure
+							if preference_value < 1 || preference_value > 10
+								raise ArgumentError, "Invalid preference value #{preference_value} for topology_keys: " + tk
+							end
+						end
+					end
+					unless @placements_info[preference_value]
+						@placements_info[preference_value] = Set.new
+					end
+					@placements_info[preference_value] << pref_part[0] # cloud.region.zone
+					log_msg "Added #{pref_part[0]} at level #{preference_value} in placements_info"
+				}
+				log_msg "placements_info - #{@placements_info}"
+				# @topology_keys = tk
+			end
+
+			begin
+				@yb_servers_refresh_interval = Integer(ri).to_i if ri
+			rescue ArgumentError => ae
+				puts "Invalid value for yb_servers_refresh_interval: #{ri}. Using the default value (300 seconds) instead."
+				@yb_servers_refresh_interval = 300
+			ensure
+				if @yb_servers_refresh_interval < 0 || @yb_servers_refresh_interval > 600
+					log_msg("Invalid value for yb_servers_refresh_interval: #{@yb_servers_refresh_interval}. Using the default value (300 seconds) instead.")
+					@yb_servers_refresh_interval = 300
+				end
+			end
+
+			begin
+				@failed_host_reconnect_delay_secs = Integer(ttl).to_i if ttl
+			rescue ArgumentError
+				log_msg("Invalid value for failed_host_reconnect_delay_secs: #{ttl}. Using the default value (5 seconds) instead.")
+			ensure
+				if @failed_host_reconnect_delay_secs < 0 || @failed_host_reconnect_delay_secs > 60
+					log_msg("Invalid value for failed_host_reconnect_delay_secs: #{@failed_host_reconnect_delay_secs}. Using the default value (5 seconds) instead.")
+					@failed_host_reconnect_delay_secs = 5
+				end
+			end
+
+			@fallback_to_topology_keys_only = fb.to_s.downcase == "true" if fb
+
+			log_msg("parse_connect_args() LB properties: lb=#{@load_balance}, tk=#{@topology_keys}, refresh=#{@yb_servers_refresh_interval}, delay=#{@failed_host_reconnect_delay_secs}, fallback=#{@fallback_to_topology_keys_only}")
+		else
+			@load_balance = false # this method may get called again
+			return
+		end
 	end
 
 	# Return a String representation of the object suitable for debugging.
@@ -856,54 +915,21 @@ class PG::Connection
 			option_string = parse_connect_args(*args)
 			iopts = PG::Connection.conninfo_parse(option_string).each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }
 			iopts = PG::Connection.conndefaults.each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }.merge(iopts)
+			log_msg("")
+			log_msg("iopts class " + iopts.class.to_s + ", iopts " + iopts.to_s)
 
 			if @load_balance
-				puts "load_balance is enabled"
-				@@mutex.lock
-				if metadata_needs_refresh
-					if @@control_connection == nil
-						@@control_connection = create_control_connection(iopts)
-					end
-					refresh_yb_servers(@@control_connection)
-					puts "Refreshed info from yb_servers(): #{@@cluster_info}"
-				end
-				@@mutex.unlock
-				success = false
-				until success
-					@@mutex.lock
-					host_port = get_least_loaded_server
-					@@mutex.unlock
-					lb_host = host_port[0]
-					lb_port = host_port[1]
-					# modify_args()
-					puts "iopts before creating a connection: " + iopts.to_s + ", iopts class: " + iopts.class.to_s
-					begin
-						iopts[:host] = lb_host
-						iopts[:port] = lb_port
-						iopts = resolve_hosts(iopts)
-						puts "iopts before creating a connection: " + iopts.to_s + ", iopts class: " + iopts.class.to_s
-						connection = do_connect_to_hosts(iopts)
-					rescue TypeError
-						@@mutex.lock
-						@@cluster_info[lb_host].count -= 1
-						if @@cluster_info[lb_host].count < 0
-							@@cluster_info[lb_host].count = 0
-							puts "DEBUG Negative count was reset to zero for #{lb_host}"
-						end
-						@@mutex.unlock
-						puts "Connection creation failed"
-					end
-					success = true
-					puts "user connection: #{connection} on #{connection.host}"
-				end
+				log_msg("load_balance is enabled")
+				connection = PG::LoadBalanceService.connect_to_lb_hosts(@yb_servers_refresh_interval,
+																																@failed_host_reconnect_delay_secs, iopts)
 			else
-				puts "load_balance is disabled"
+				log_msg("load_balance is disabled")
 				connection = do_connect_to_hosts(iopts)
 			end
 			connection
 		end
 
-		private def do_connect_to_hosts(iopts)
+		def do_connect_to_hosts(iopts)
 			if iopts[:hostaddr]
 				# hostaddr is provided -> no need to resolve hostnames
 
@@ -921,86 +947,30 @@ class PG::Connection
 			conn
 		end
 
-		private def create_control_connection(iopts)
-			# todo loop until control connection is successful or all nodes are tried
-			do_connect_to_hosts(iopts)
+		private def log_msg(msg)
+			puts "-----> " + msg
 		end
 
-		private def refresh_yb_servers(conn)
-			puts "Refreshing yb_servers() on #{conn}"  #", methods: #{conn.methods.sort}"
-			# conninfo, host, close, lo_close, loclose
-			rs = conn.exec("select * from yb_servers()")
-			rs.each do |row|
-				# todo resolve host addresses
-				host = row['host']
-				port = row['port']
-				cloud = row['cloud']
-				region = row['region']
-				zone = row['zone']
-				public_ip = row['public_ip']
-
-				# todo set useHostColumn field
-				puts "refreshing host: #{host} ..."
-				old = @@cluster_info[host]
-				if old
-					puts "host entry already present"
-					if old.is_down
-						if Time.now - old.down_since > @failed_host_reconnect_delay_secs
-							old.is_down = false
-						else
-							puts "host entry already present, but recently marked as down"
-						end
-						@@cluster_info[host] = old
-					end
-				else
-					puts "creating new host entry ..."
-					node = Node.new(host, port, cloud, region, zone, public_ip, 0, false, 0)
-					@@cluster_info[host] = node
-				end
-			end
-			@@last_refresh_time = Time.now.to_i
-			puts "cluster_info: " + @@cluster_info.to_s
-		end
-
-		private def get_least_loaded_server
-			# @@cluster_info.find_all()
-			only_up = @@cluster_info.values.select { |n| !n.is_down }
-			min_connections = 1000000 # Integer::MAX
-			selected = Array.new
-			selected_node = ""
-			@@cluster_info.each do |host, node_info|
-				unless node_info.is_down
-					if node_info.count < min_connections
-						min_connections = node_info.count
-						selected.clear
-						selected.push(host)
-					elsif node_info.count == min_connections
-						selected.push(host)
-					end
-				end
-			end
-
-			unless selected.empty?
-				index = rand(selected.size)
-				selected_node = selected[index]
-				puts "least loaded host: #{selected_node}"
-				@@cluster_info[selected_node].count += 1
-			end
-			Array[selected_node, @@cluster_info[selected_node].port]
-		end
-
-		private def metadata_needs_refresh
-			puts "now: #{Time.now.to_i},  last refresh time: #{@@last_refresh_time}"
-			if Time.now.to_i - @@last_refresh_time > @yb_servers_refresh_interval # || force_refresh == true
-				puts "Time to refresh"
-				true
+		private def resolve_host(mhost)
+			if host_is_named_pipe?(mhost)
+				# No hostname to resolve (UnixSocket)
+				hostaddrs = [nil]
 			else
-				puts "No refresh needed"
-				false
+				if Fiber.respond_to?(:scheduler) &&
+					Fiber.scheduler &&
+					RUBY_VERSION < '3.1.'
+
+					# Use a second thread to avoid blocking of the scheduler.
+					# `TCPSocket.gethostbyname` isn't fiber aware before ruby-3.1.
+					hostaddrs = Thread.new { Addrinfo.getaddrinfo(mhost, nil, nil, :STREAM).map(&:ip_address) rescue [''] }.value
+				else
+					hostaddrs = Addrinfo.getaddrinfo(mhost, nil, nil, :STREAM).map(&:ip_address) rescue ['']
+				end
 			end
+			hostaddrs.map { |hostaddr| [hostaddr, mhost] }
 		end
 
-		private def host_is_named_pipe?(host_string)
+		def host_is_named_pipe?(host_string)
 			host_string.empty? || host_string.start_with?("/") ||  # it's UnixSocket?
 							host_string.start_with?("@") ||  # it's UnixSocket in the abstract namespace?
 							# it's a path on Windows?
