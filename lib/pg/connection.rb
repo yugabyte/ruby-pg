@@ -925,6 +925,7 @@ class PG::Connection
 			else
 				log_msg("load_balance is disabled")
 				connection = do_connect_to_hosts(iopts)
+				log_msg "created regular connection to #{connection.host}"
 			end
 			connection
 		end

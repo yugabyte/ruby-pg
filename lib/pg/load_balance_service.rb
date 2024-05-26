@@ -21,13 +21,39 @@ class PG::LoadBalanceService
   end
 
   def self.get_load(host)
-    # Implement this method
+    if @@cluster_info[host]
+      @@cluster_info[host].count
+    else
+      0
+    end
   end
 
   def self.increment_connection_count(host)
-    # Implement this method
+    @@mutex.acquire_write_lock
+    if @@cluster_info[host].nil?
+      log_msg "WARN unexpected situation: did not find entry for #{host} in #{@@cluster_info} while incrementing count"
+    else
+      @@cluster_info[host].count += 1
+    end
+    @@mutex.release_write_lock
   end
 
+  def self.decrement_connection_count(host)
+    # log_msg "decrement_connection_count -------------- for #{host}"
+    @@mutex.acquire_write_lock
+    info = @@cluster_info[host]
+    unless info.nil?
+      info.count -= 1
+      puts "DEBUG Decremented connection count for #{host} by one. Latest count: #{info.count}"
+      if info.count < 0
+        info.count = 0
+        puts "DEBUG Resetting connection count for #{host} to zero."
+      end
+      return true
+    end
+    @@mutex.release_write_lock
+    false
+  end
   # def self.parse_connect_lb_args (hash_arg)
   #   lb = hash_arg.delete(:load_balance)
   #   tk = hash_arg.delete(:topology_keys)
@@ -144,7 +170,7 @@ class PG::LoadBalanceService
           log_msg("DEBUG Negative count was reset to zero for #{lb_host}")
         end
         @@mutex.release_write_lock
-        log_msg("Connection creation failed")
+        log_msg("Connection creation failed: #{e}")
       end
     end
     connection
