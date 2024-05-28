@@ -915,14 +915,25 @@ class PG::Connection
 			iopts = PG::Connection.conndefaults.each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }.merge(iopts)
 			log_msg("")
 			log_msg("iopts class " + iopts.class.to_s + ", iopts " + iopts.to_s)
+			original_host = iopts[:host]
+			original_port = iopts[:port]
 
 			if @load_balance
 				log_msg("load_balance is enabled")
 				connection = PG::LoadBalanceService.connect_to_lb_hosts(@yb_servers_refresh_interval,
 																																@failed_host_reconnect_delay_secs,
-																																@placements_info, iopts)
-			else
-				log_msg("load_balance is disabled")
+																																@fallback_to_topology_keys_only,
+																																@placements_info,
+																																iopts)
+			end
+			if connection.nil?
+				if @load_balance
+					log_msg "load balance failed, original_host = #{original_host}"
+					iopts[:host] = original_host
+					iopts[:port] = original_port
+				else
+					log_msg "load_balance disabled"
+				end
 				connection = do_connect_to_hosts(iopts)
 				log_msg "created regular connection to #{connection.host}"
 			end

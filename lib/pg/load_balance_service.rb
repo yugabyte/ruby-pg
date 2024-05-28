@@ -55,7 +55,7 @@ class PG::LoadBalanceService
     false
   end
 
-  def self.connect_to_lb_hosts(refresh_interval, failed_host_reconnect_delay_secs, placements_info, iopts)
+  def self.connect_to_lb_hosts(refresh_interval, failed_host_reconnect_delay_secs, fallback_to_tk_only, placements_info, iopts)
     refresh_done = false
     @@mutex.acquire_write_lock
     if metadata_needs_refresh refresh_interval
@@ -100,17 +100,19 @@ class PG::LoadBalanceService
     placement_index = 1
     until success
       @@mutex.acquire_write_lock
-      host_port = get_least_loaded_server(placements_info, new_request, placement_index)
+      host_port = get_least_loaded_server(placements_info, fallback_to_tk_only, new_request, placement_index)
       new_request = false
       @@mutex.release_write_lock
       unless host_port
+        log_msg "No hosts available"
         break
       end
       lb_host = host_port[0]
       lb_port = host_port[1]
       placement_index = host_port[2]
-      if lb_host == ""
-        raise ArgumentError.new("No hosts available")
+      if lb_host.empty?
+        log_msg "No hosts available"
+        break
       end
       # modify iopts args
       begin
@@ -213,16 +215,16 @@ class PG::LoadBalanceService
     log_msg("cluster_info: " + @@cluster_info.to_s)
   end
 
-  def self.get_least_loaded_server(allowed_placements, new_request, placement_index)
+  def self.get_least_loaded_server(allowed_placements, fallback_to_tk_only, new_request, placement_index)
     current_index = 1
+    selected = Array.new
     unless allowed_placements.empty? # topology-aware
       log_msg "topology keys given #{allowed_placements}, new? #{new_request}, placement index #{placement_index}"
       eligible_hosts = Array.new
-      selected = Array.new
       (placement_index..10).each { |idx|
         current_index = idx
         selected.clear
-        min_connections = 1000000
+        min_connections = 1000000 # Using some really high value
         @@cluster_info.each do |host, node_info|
           unless node_info.is_down
             unless allowed_placements[idx].nil?
@@ -240,7 +242,7 @@ class PG::LoadBalanceService
                     log_msg "Found another least loaded host: #{host} - #{node_info.count}"
                     selected.push(host)
                   end
-                  break # Move to next node
+                  break # Move to the next node
                 end
               end
             end
@@ -251,8 +253,13 @@ class PG::LoadBalanceService
           break
         end
       }
-    else # cluster-aware
-      min_connections = 1000000 # Integer::MAX throws some error
+    end
+
+    if allowed_placements.empty? || (selected.empty? && !fallback_to_tk_only) # cluster-aware || fallback_to_tk_only = false
+      unless allowed_placements.empty?
+        log_msg "Falling back to rest of the cluster"
+      end
+      min_connections = 1000000 # Using some really high value
       selected = Array.new
       @@cluster_info.each do |host, node_info|
         unless node_info.is_down
@@ -268,6 +275,7 @@ class PG::LoadBalanceService
     end
 
     if selected.empty?
+      log_msg "returning nil from get_least_loaded_server()"
       nil
     else
       index = rand(selected.size)
