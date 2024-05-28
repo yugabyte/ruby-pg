@@ -54,51 +54,8 @@ class PG::LoadBalanceService
     @@mutex.release_write_lock
     false
   end
-  # def self.parse_connect_lb_args (hash_arg)
-  #   lb = hash_arg.delete(:load_balance)
-  #   tk = hash_arg.delete(:topology_keys)
-  #   ri = hash_arg.delete(:yb_servers_refresh_interval)
-  #   ttl = hash_arg.delete(:failed_host_reconnect_delay_secs)
-  #   fb = hash_arg.delete(:fallback_to_topology_keys_only)
-  #
-  #   @load_balance = lb.to_s.downcase == "true" if lb
-  #   if tk
-  #     tk_parts = tk.split('.', -1)
-  #     if tk_parts.length != 3
-  #       raise ArgumentError "Invalid value specified for topology_keys: " + tk
-  #     end
-  #     @topology_keys = tk
-  #   end
-  #
-  #   begin
-  #     @yb_servers_refresh_interval = Integer(ri).to_i if ri
-  #   rescue ArgumentError
-  #     puts "Invalid value for yb_servers_refresh_interval: #{@yb_servers_refresh_interval}. Using the default value (300 seconds) instead."
-  #     @yb_servers_refresh_interval = 300
-  #   ensure
-  #     if @yb_servers_refresh_interval < 0 || @yb_servers_refresh_interval > 600
-  #       log_msg("Invalid value for yb_servers_refresh_interval: #{@yb_servers_refresh_interval}. Using the default value (300 seconds) instead.")
-  #       @yb_servers_refresh_interval = 300
-  #     end
-  #   end
-  #
-  #   begin
-  #     @failed_host_reconnect_delay_secs = Integer(ttl).to_i if ttl
-  #   rescue ArgumentError
-  #     log_msg("Invalid value for failed_host_reconnect_delay_secs: #{@failed_host_reconnect_delay_secs}. Using the default value (5 seconds) instead.")
-  #   ensure
-  #     if @failed_host_reconnect_delay_secs < 0 || @failed_host_reconnect_delay_secs > 60
-  #       log_msg("Invalid value for failed_host_reconnect_delay_secs: #{@failed_host_reconnect_delay_secs}. Using the default value (5 seconds) instead.")
-  #       @failed_host_reconnect_delay_secs = 5
-  #     end
-  #   end
-  #
-  #   @fallback_to_topology_keys_only = fb.to_s.downcase == "true" if fb
-  #
-  #   log_msg("parse_connect_args() LB properties: lb=#{@load_balance}, tk=#{@topology_keys}, refresh=#{@yb_servers_refresh_interval}, delay=#{@failed_host_reconnect_delay_secs}, fallback=#{@fallback_to_topology_keys_only}")
-  # end
 
-  def self.connect_to_lb_hosts(refresh_interval, failed_host_reconnect_delay_secs, iopts)
+  def self.connect_to_lb_hosts(refresh_interval, failed_host_reconnect_delay_secs, placements_info, iopts)
     refresh_done = false
     @@mutex.acquire_write_lock
     if metadata_needs_refresh refresh_interval
@@ -139,15 +96,19 @@ class PG::LoadBalanceService
     end
     @@mutex.release_write_lock
     success = false
+    new_request = true
+    placement_index = 1
     until success
       @@mutex.acquire_write_lock
-      host_port = get_least_loaded_server
+      host_port = get_least_loaded_server(placements_info, new_request, placement_index)
+      new_request = false
       @@mutex.release_write_lock
       unless host_port
         break
       end
       lb_host = host_port[0]
       lb_port = host_port[1]
+      placement_index = host_port[2]
       if lb_host == ""
         raise ArgumentError.new("No hosts available")
       end
@@ -252,17 +213,56 @@ class PG::LoadBalanceService
     log_msg("cluster_info: " + @@cluster_info.to_s)
   end
 
-  def self.get_least_loaded_server
-    min_connections = 1000000 # Integer::MAX throws some error
-    selected = Array.new
-    @@cluster_info.each do |host, node_info|
-      unless node_info.is_down
-        if node_info.count < min_connections
-          min_connections = node_info.count
-          selected.clear
-          selected.push(host)
-        elsif node_info.count == min_connections
-          selected.push(host)
+  def self.get_least_loaded_server(allowed_placements, new_request, placement_index)
+    current_index = 1
+    unless allowed_placements.empty? # topology-aware
+      log_msg "topology keys given #{allowed_placements}, new? #{new_request}, placement index #{placement_index}"
+      eligible_hosts = Array.new
+      selected = Array.new
+      (placement_index..10).each { |idx|
+        current_index = idx
+        selected.clear
+        min_connections = 1000000
+        @@cluster_info.each do |host, node_info|
+          unless node_info.is_down
+            unless allowed_placements[idx].nil?
+              allowed_placements[idx].each do | cp |
+                log_msg "checking #{host} with cp: #{cp[0]}, #{cp[1]}, #{cp[2]}"
+                if cp[0] == node_info.cloud && cp[1] == node_info.region && (cp[2] == node_info.zone || cp[2] == "*")
+                  log_msg "eligible host #{host}"
+                  eligible_hosts << host
+                  if node_info.count < min_connections
+                    min_connections = node_info.count
+                    selected.clear
+                    log_msg "Found new least loaded host: #{host} - #{node_info.count}"
+                    selected.push(host)
+                  elsif node_info.count == min_connections
+                    log_msg "Found another least loaded host: #{host} - #{node_info.count}"
+                    selected.push(host)
+                  end
+                  break # Move to next node
+                end
+              end
+            end
+          end
+        end
+        log_msg "Found #{selected.length} hosts in level #{idx} with least load"
+        if selected.length > 0
+          break
+        end
+      }
+    else # cluster-aware
+      min_connections = 1000000 # Integer::MAX throws some error
+      selected = Array.new
+      @@cluster_info.each do |host, node_info|
+        unless node_info.is_down
+          if node_info.count < min_connections
+            min_connections = node_info.count
+            selected.clear
+            selected.push(host)
+          elsif node_info.count == min_connections
+            selected.push(host)
+          end
         end
       end
     end
@@ -274,7 +274,7 @@ class PG::LoadBalanceService
       selected_node = selected[index]
       log_msg("least loaded host: #{selected_node}")
       @@cluster_info[selected_node].count += 1
-      Array[selected_node, @@cluster_info[selected_node].port]
+      Array[selected_node, @@cluster_info[selected_node].port, current_index]
     end
   end
 

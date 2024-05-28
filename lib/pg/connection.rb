@@ -34,17 +34,12 @@ class PG::Connection
 	CONNECT_ARGUMENT_ORDER = %w[host port options tty dbname user password load_balance topology_keys].freeze
 	private_constant :CONNECT_ARGUMENT_ORDER
 	@load_balance = false
-	# @topology_keys = nil
 	@placements_info = Hash.new
 	@yb_servers_refresh_interval = 300
 	@fallback_to_topology_keys_only = false
 	@failed_host_reconnect_delay_secs = 5
 
-	Node = Struct.new(:host, :port, :cloud, :region, :zone, :public_ip, :count, :is_down, :down_since)
-	@@mutex = Mutex.new
-	@@last_refresh_time = -1
-	@@control_connection = nil
-	@@cluster_info = { }
+	CloudPlacement = Struct.new(:cloud, :region, :zone)
 
 	### Quote a single +value+ for use in a connection-parameter string.
 	def self.quote_connstr( value )
@@ -125,42 +120,45 @@ class PG::Connection
 		if lb && lb.to_s.downcase == "true"
 			@load_balance = true
 			if tk
-				placements = Set.new
+				@placements_info.clear
 				tk_parts = tk.split(',', -1)
 				tk_parts.each {
-					|tk_part|
-					single_tk = tk_part.split('.', -1)
-					if single_tk.length != 3
-						raise ArgumentError, "Invalid value #{tk_part} specified for topology_keys: " + tk
+					|single_tk|
+					if single_tk.empty?
+						raise ArgumentError, "Empty value for topology_keys specified"
 					end
-					pref_part = tk_part.split(':', -1)
-					if pref_part.length > 2
-						raise ArgumentError, "Invalid preference value #{pref_part} specified for topology_keys: " + tk
+					single_tk_parts = single_tk.split(':', -1)
+					if single_tk_parts.length > 2
+						raise ArgumentError, "Invalid preference value '#{single_tk_parts}' specified for topology_keys: " + tk
+					end
+					cp = single_tk_parts[0].split('.', -1)
+					if cp.length != 3
+						raise ArgumentError, "Invalid cloud placement value '#{single_tk_parts[0]}' specified for topology_keys: " + tk
 					end
 					preference_value = 1
-					if pref_part.length == 2
-						preference = pref_part[1]
+					if single_tk_parts.length == 2
+						preference = single_tk_parts[1]
+						log_msg "preference value specified #{preference}"
 						if preference == ""
 							raise ArgumentError, "No preference value specified for topology_keys: " + tk
 						end
 						begin
 							preference_value = Integer(preference).to_i
 						rescue
-							raise ArgumentError, "Invalid preference value #{preference} for topology_keys: " + tk
+							raise ArgumentError, "Invalid preference value '#{preference}' for topology_keys: " + tk
 						ensure
 							if preference_value < 1 || preference_value > 10
-								raise ArgumentError, "Invalid preference value #{preference_value} for topology_keys: " + tk
+								raise ArgumentError, "Invalid preference value '#{preference_value}' for topology_keys: " + tk
 							end
 						end
 					end
 					unless @placements_info[preference_value]
 						@placements_info[preference_value] = Set.new
 					end
-					@placements_info[preference_value] << pref_part[0] # cloud.region.zone
-					log_msg "Added #{pref_part[0]} at level #{preference_value} in placements_info"
+					@placements_info[preference_value] << CloudPlacement.new(cp[0], cp[1], cp[2])
+					log_msg "Added #{single_tk_parts[0]} at level #{preference_value} in placements_info"
 				}
 				log_msg "placements_info - #{@placements_info}"
-				# @topology_keys = tk
 			end
 
 			begin
@@ -921,7 +919,8 @@ class PG::Connection
 			if @load_balance
 				log_msg("load_balance is enabled")
 				connection = PG::LoadBalanceService.connect_to_lb_hosts(@yb_servers_refresh_interval,
-																																@failed_host_reconnect_delay_secs, iopts)
+																																@failed_host_reconnect_delay_secs,
+																																@placements_info, iopts)
 			else
 				log_msg("load_balance is disabled")
 				connection = do_connect_to_hosts(iopts)
