@@ -31,15 +31,10 @@ require_relative 'load_balance_service'
 class PG::Connection
 
 	# The order the options are passed to the ::connect method.
-	CONNECT_ARGUMENT_ORDER = %w[host port options tty dbname user password load_balance topology_keys].freeze
-	private_constant :CONNECT_ARGUMENT_ORDER
-	@load_balance = false
-	@placements_info = Hash.new
-	@yb_servers_refresh_interval = 300
-	@fallback_to_topology_keys_only = false
-	@failed_host_reconnect_delay_secs = 5
-
+	CONNECT_ARGUMENT_ORDER = %w[host port options tty dbname user password load_balance topology_keys yb_servers_refresh_interval fallback_to_topology_keys_only failed_host_reconnect_delay_secs].freeze
+	LBProperties = Struct.new(:placements_info, :refresh_interval, :fallback_to_tk_only, :failed_host_reconnect_delay)
 	CloudPlacement = Struct.new(:cloud, :region, :zone)
+	private_constant :CONNECT_ARGUMENT_ORDER
 
 	### Quote a single +value+ for use in a connection-parameter string.
 	def self.quote_connstr( value )
@@ -70,6 +65,11 @@ class PG::Connection
 	# The method adds the option "fallback_application_name" if it isn't already set.
 	# It returns a connection string with "key=value" pairs.
 	def self.parse_connect_args( *args )
+		conn_info, _ = parse_connect_args_and_return_lb_props(*args)
+		conn_info
+	end
+
+	def self.parse_connect_args_and_return_lb_props( *args )
 		log_msg(Thread.current.to_s + "] parse_connect_args() args.length: " + args.length.to_s + ", " + args.to_s)
 		# log_msg("parse_connect_args() args.last: " + args.last.to_s)
 		# log_msg("parse_connect_args() args.last is a hash?: " + args.last.is_a?( Hash ).to_s)
@@ -99,7 +99,7 @@ class PG::Connection
 			iopts.delete(:tty) # ignore obsolete tty parameter
 		end
 
-		parse_connect_lb_args hash_arg
+		lb_props = parse_connect_lb_args hash_arg
 
 		iopts.merge!( hash_arg )
 
@@ -107,7 +107,7 @@ class PG::Connection
 			iopts[:fallback_application_name] = PROGRAM_NAME.sub( /^(.{30}).{4,}(.{30})$/ ){ $1+"..."+$2 }
 		end
 
-		return connect_hash_to_string(iopts)
+		return connect_hash_to_string(iopts), lb_props
 	end
 
 	def self.parse_connect_lb_args(hash_arg)
@@ -118,9 +118,9 @@ class PG::Connection
 		fb = hash_arg.delete(:fallback_to_topology_keys_only)
 
 		if lb && lb.to_s.downcase == "true"
-			@load_balance = true
+			lb_properties = LBProperties.new(nil, 300, false, 5)
 			if tk
-				@placements_info.clear
+				lb_properties.placements_info = Hash.new
 				tk_parts = tk.split(',', -1)
 				tk_parts.each {
 					|single_tk|
@@ -152,45 +152,45 @@ class PG::Connection
 							end
 						end
 					end
-					unless @placements_info[preference_value]
-						@placements_info[preference_value] = Set.new
+					unless lb_properties.placements_info[preference_value]
+						lb_properties.placements_info[preference_value] = Set.new
 					end
-					@placements_info[preference_value] << CloudPlacement.new(cp[0], cp[1], cp[2])
+					lb_properties.placements_info[preference_value] << CloudPlacement.new(cp[0], cp[1], cp[2])
 					log_msg "Added #{single_tk_parts[0]} at level #{preference_value} in placements_info"
 				}
-				log_msg "placements_info - #{@placements_info}"
+				log_msg "placements_info - #{lb_properties.placements_info}"
 			end
 
 			begin
-				@yb_servers_refresh_interval = Integer(ri).to_i if ri
+				lb_properties.refresh_interval = Integer(ri).to_i if ri
 			rescue ArgumentError => ae
 				puts "Invalid value for yb_servers_refresh_interval: #{ri}. Using the default value (300 seconds) instead."
-				@yb_servers_refresh_interval = 300
+				lb_properties.refresh_interval = 300
 			ensure
-				if @yb_servers_refresh_interval < 0 || @yb_servers_refresh_interval > 600
-					log_msg("Invalid value for yb_servers_refresh_interval: #{@yb_servers_refresh_interval}. Using the default value (300 seconds) instead.")
-					@yb_servers_refresh_interval = 300
+				if lb_properties.refresh_interval < 0 || lb_properties.refresh_interval > 600
+					log_msg("Invalid value for yb_servers_refresh_interval: #{lb_properties.refresh_interval}. Using the default value (300 seconds) instead.")
+					lb_properties.refresh_interval = 300
 				end
 			end
 
 			begin
-				@failed_host_reconnect_delay_secs = Integer(ttl).to_i if ttl
+				lb_properties.failed_host_reconnect_delay = Integer(ttl).to_i if ttl
 			rescue ArgumentError
 				log_msg("Invalid value for failed_host_reconnect_delay_secs: #{ttl}. Using the default value (5 seconds) instead.")
 			ensure
-				if @failed_host_reconnect_delay_secs < 0 || @failed_host_reconnect_delay_secs > 60
-					log_msg("Invalid value for failed_host_reconnect_delay_secs: #{@failed_host_reconnect_delay_secs}. Using the default value (5 seconds) instead.")
-					@failed_host_reconnect_delay_secs = 5
+				if lb_properties.failed_host_reconnect_delay < 0 || lb_properties.failed_host_reconnect_delay > 60
+					log_msg("Invalid value for failed_host_reconnect_delay_secs: #{lb_properties.failed_host_reconnect_delay}. Using the default value (5 seconds) instead.")
+					lb_properties.failed_host_reconnect_delay = 5
 				end
 			end
 
-			@fallback_to_topology_keys_only = fb.to_s.downcase == "true" if fb
+			lb_properties.fallback_to_tk_only = fb.to_s.downcase == "true" if fb
 
-			log_msg("parse_connect_args() LB properties: lb=#{@load_balance}, tk=#{@topology_keys}, refresh=#{@yb_servers_refresh_interval}, delay=#{@failed_host_reconnect_delay_secs}, fallback=#{@fallback_to_topology_keys_only}")
+			log_msg("parse_connect_args() LB properties: #{lb_properties}")
 		else
-			@load_balance = false # this method may get called again
-			return
+			lb_properties = nil
 		end
+		lb_properties
 	end
 
 	# Return a String representation of the object suitable for debugging.
@@ -910,24 +910,19 @@ class PG::Connection
 		end
 
 		private def connect_to_hosts(*args)
-			option_string = parse_connect_args(*args)
+			option_string, lb_properties = parse_connect_args_and_return_lb_props(*args)
 			iopts = PG::Connection.conninfo_parse(option_string).each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }
 			iopts = PG::Connection.conndefaults.each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }.merge(iopts)
-			log_msg("")
 			log_msg("iopts class " + iopts.class.to_s + ", iopts " + iopts.to_s)
 			original_host = iopts[:host]
 			original_port = iopts[:port]
 
-			if @load_balance
+			if lb_properties
 				log_msg("load_balance is enabled")
-				connection = PG::LoadBalanceService.connect_to_lb_hosts(@yb_servers_refresh_interval,
-																																@failed_host_reconnect_delay_secs,
-																																@fallback_to_topology_keys_only,
-																																@placements_info,
-																																iopts)
+				connection = PG::LoadBalanceService.connect_to_lb_hosts(lb_properties, iopts)
 			end
 			if connection.nil?
-				if @load_balance
+				if lb_properties
 					log_msg "load balance failed, original_host = #{original_host}"
 					iopts[:host] = original_host
 					iopts[:port] = original_port

@@ -46,6 +46,7 @@ class PG::LoadBalanceService
       info.count -= 1
       puts "DEBUG Decremented connection count for #{host} by one. Latest count: #{info.count}"
       if info.count < 0
+        # Can go negative if we are here because of a connection that was created in a non-LB fashion
         info.count = 0
         puts "DEBUG Resetting connection count for #{host} to zero."
       end
@@ -55,17 +56,17 @@ class PG::LoadBalanceService
     false
   end
 
-  def self.connect_to_lb_hosts(refresh_interval, failed_host_reconnect_delay_secs, fallback_to_tk_only, placements_info, iopts)
+  def self.connect_to_lb_hosts(lb_props, iopts)
     refresh_done = false
     @@mutex.acquire_write_lock
-    if metadata_needs_refresh refresh_interval
+    if metadata_needs_refresh lb_props.refresh_interval
       while !refresh_done
         if @@control_connection == nil
           @@control_connection = create_control_connection(iopts)
         end
         log_msg("control conn #{@@control_connection} on #{@@control_connection.host}")
         begin
-          refresh_yb_servers(failed_host_reconnect_delay_secs, @@control_connection)
+          refresh_yb_servers(lb_props.failed_host_reconnect_delay, @@control_connection)
           refresh_done = true
           log_msg("Refreshed info from yb_servers(): #{@@cluster_info}")
         rescue => err
@@ -100,7 +101,7 @@ class PG::LoadBalanceService
     placement_index = 1
     until success
       @@mutex.acquire_write_lock
-      host_port = get_least_loaded_server(placements_info, fallback_to_tk_only, new_request, placement_index)
+      host_port = get_least_loaded_server(lb_props.placements_info, lb_props.fallback_to_tk_only, new_request, placement_index)
       new_request = false
       @@mutex.release_write_lock
       unless host_port
@@ -140,9 +141,9 @@ class PG::LoadBalanceService
   end
 
   def self.create_control_connection(iopts)
-    # todo loop until control connection is successful or all nodes are tried
     conn = nil
     success = false
+    # Iterate until control connection is successful or all nodes are tried
     until success
       begin
         log_msg("Attempting control connection ... #{iopts}")
@@ -218,7 +219,7 @@ class PG::LoadBalanceService
   def self.get_least_loaded_server(allowed_placements, fallback_to_tk_only, new_request, placement_index)
     current_index = 1
     selected = Array.new
-    unless allowed_placements.empty? # topology-aware
+    unless allowed_placements.nil? # topology-aware
       log_msg "topology keys given #{allowed_placements}, new? #{new_request}, placement index #{placement_index}"
       eligible_hosts = Array.new
       (placement_index..10).each { |idx|
@@ -228,7 +229,7 @@ class PG::LoadBalanceService
         @@cluster_info.each do |host, node_info|
           unless node_info.is_down
             unless allowed_placements[idx].nil?
-              allowed_placements[idx].each do | cp |
+              allowed_placements[idx].each do |cp|
                 log_msg "checking #{host} with cp: #{cp[0]}, #{cp[1]}, #{cp[2]}"
                 if cp[0] == node_info.cloud && cp[1] == node_info.region && (cp[2] == node_info.zone || cp[2] == "*")
                   log_msg "eligible host #{host}"
@@ -255,8 +256,8 @@ class PG::LoadBalanceService
       }
     end
 
-    if allowed_placements.empty? || (selected.empty? && !fallback_to_tk_only) # cluster-aware || fallback_to_tk_only = false
-      unless allowed_placements.empty?
+    if allowed_placements.nil? || (selected.empty? && !fallback_to_tk_only) # cluster-aware || fallback_to_tk_only = false
+      unless allowed_placements.nil?
         log_msg "Falling back to rest of the cluster"
       end
       min_connections = 1000000 # Using some really high value
