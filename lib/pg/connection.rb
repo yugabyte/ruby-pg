@@ -70,12 +70,16 @@ class PG::Connection
 	end
 
 	def self.parse_connect_args_and_return_lb_props( *args )
-		log_msg(Thread.current.to_s + "] parse_connect_args() args.length: " + args.length.to_s + ", " + args.to_s)
+		log_msg "#{Thread.current}] parse_connect_args() args.length: #{args.length}, class: #{args.class}, #{args}"
 		# log_msg("parse_connect_args() args.last: " + args.last.to_s)
 		# log_msg("parse_connect_args() args.last is a hash?: " + args.last.is_a?( Hash ).to_s)
 		hash_arg = args.last.is_a?( Hash ) ? args.pop.transform_keys(&:to_sym) : {}
 		log_msg("parse_connect_args() hash_arg: " + hash_arg.class.to_s + ", " + hash_arg.to_s)
 		iopts = {}
+		unless hash_arg.key?(:port)
+			log_msg "Setting port to 5433 in hash_arg"
+			hash_arg[:port] = 5433
+		end
 
 		if args.length == 1
 			case args.first.to_s

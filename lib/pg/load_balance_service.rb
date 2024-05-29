@@ -4,12 +4,6 @@ require 'concurrent'
 
 class PG::LoadBalanceService
 
-  # @load_balance = false
-  # @topology_keys = nil
-  # @yb_servers_refresh_interval = 300
-  # @fallback_to_topology_keys_only = false
-  # @failed_host_reconnect_delay_secs = 5
-
   Node = Struct.new(:host, :port, :cloud, :region, :zone, :public_ip, :count, :is_down, :down_since)
   @@mutex = Concurrent::ReentrantReadWriteLock.new
   @@last_refresh_time = -1
@@ -28,82 +22,81 @@ class PG::LoadBalanceService
     end
   end
 
-  def self.increment_connection_count(host)
-    @@mutex.acquire_write_lock
-    if @@cluster_info[host].nil?
-      log_msg "WARN unexpected situation: did not find entry for #{host} in #{@@cluster_info} while incrementing count"
-    else
-      @@cluster_info[host].count += 1
-    end
-    @@mutex.release_write_lock
-  end
-
   def self.decrement_connection_count(host)
     # log_msg "decrement_connection_count -------------- for #{host}"
     @@mutex.acquire_write_lock
-    info = @@cluster_info[host]
-    unless info.nil?
-      info.count -= 1
-      puts "DEBUG Decremented connection count for #{host} by one. Latest count: #{info.count}"
-      if info.count < 0
-        # Can go negative if we are here because of a connection that was created in a non-LB fashion
-        info.count = 0
-        puts "DEBUG Resetting connection count for #{host} to zero."
+    begin
+      info = @@cluster_info[host]
+      unless info.nil?
+        info.count -= 1
+        puts "DEBUG Decremented connection count for #{host} by one. Latest count: #{info.count}"
+        if info.count < 0
+          # Can go negative if we are here because of a connection that was created in a non-LB fashion
+          info.count = 0
+          puts "DEBUG Resetting connection count for #{host} to zero."
+        end
+        return true
       end
-      return true
+    ensure
+      @@mutex.release_write_lock
     end
-    @@mutex.release_write_lock
     false
   end
 
   def self.connect_to_lb_hosts(lb_props, iopts)
     refresh_done = false
     @@mutex.acquire_write_lock
-    if metadata_needs_refresh lb_props.refresh_interval
-      while !refresh_done
-        if @@control_connection == nil
-          @@control_connection = create_control_connection(iopts)
-        end
-        log_msg("control conn #{@@control_connection} on #{@@control_connection.host}")
-        begin
-          refresh_yb_servers(lb_props.failed_host_reconnect_delay, @@control_connection)
-          refresh_done = true
-          log_msg("Refreshed info from yb_servers(): #{@@cluster_info}")
-        rescue => err
-          log_msg "Failed to refresh yb_servers() info with control connection on #{@@control_connection.host} - #{err}, trying with new control connection"
-          # iopts[:host] = @@control_connection.host
-          if iopts[:host] == @@control_connection.host
-            if @@cluster_info[iopts[:host]]
-              @@cluster_info[iopts[:host]].is_down = true
-              @@cluster_info[iopts[:host]].down_since = Time.now.to_i
-            end
-
-            log_msg "cluster info: " + @@cluster_info.to_s
-            new_list = @@cluster_info.select {|k, v| !v.is_down }
-            if new_list.length > 0
-              h = new_list.keys.first
-              iopts[:port] = new_list[h].port
-              iopts[:host] = h
-              log_msg "new selected node: #{h} and updated iopts = #{iopts}"
-            else
-              raise(PG::Error, "Unable to create a control connection")
-            end
+    begin
+      if metadata_needs_refresh lb_props.refresh_interval
+        while !refresh_done
+          if @@control_connection == nil
+            @@control_connection = create_control_connection(iopts)
           end
-          log_msg "retrying control connection with iopts: " + iopts.to_s
-          @@control_connection = create_control_connection(iopts)
-          log_msg("control conn #{@@control_connection} created on #{@@control_connection.host}")
+          log_msg("control conn #{@@control_connection} on #{@@control_connection.host}")
+          begin
+            refresh_yb_servers(lb_props.failed_host_reconnect_delay, @@control_connection)
+            refresh_done = true
+            log_msg("Refreshed info from yb_servers(): #{@@cluster_info}")
+          rescue => err
+            log_msg "Failed to refresh yb_servers() info with control connection on #{@@control_connection.host} - #{err}, trying with new control connection"
+            if iopts[:host] == @@control_connection.host
+              if @@cluster_info[iopts[:host]]
+                @@cluster_info[iopts[:host]].is_down = true
+                @@cluster_info[iopts[:host]].down_since = Time.now.to_i
+              end
+
+              log_msg "cluster info: " + @@cluster_info.to_s
+              new_list = @@cluster_info.select {|k, v| !v.is_down }
+              if new_list.length > 0
+                h = new_list.keys.first
+                iopts[:port] = new_list[h].port
+                iopts[:host] = h
+                log_msg "new selected node: #{h} and updated iopts = #{iopts}"
+              else
+                # return nil
+                raise(PG::Error, "Unable to create a control connection")
+              end
+            end
+            log_msg "retrying control connection with iopts: " + iopts.to_s
+            @@control_connection = create_control_connection(iopts)
+            log_msg("control conn #{@@control_connection} created on #{@@control_connection.host}")
+          end
         end
       end
+    ensure
+      @@mutex.release_write_lock
     end
-    @@mutex.release_write_lock
     success = false
     new_request = true
     placement_index = 1
     until success
       @@mutex.acquire_write_lock
-      host_port = get_least_loaded_server(lb_props.placements_info, lb_props.fallback_to_tk_only, new_request, placement_index)
-      new_request = false
-      @@mutex.release_write_lock
+      begin
+        host_port = get_least_loaded_server(lb_props.placements_info, lb_props.fallback_to_tk_only, new_request, placement_index)
+        new_request = false
+      ensure
+        @@mutex.release_write_lock
+      end
       unless host_port
         log_msg "No hosts available"
         break
@@ -126,14 +119,17 @@ class PG::LoadBalanceService
         log_msg("user connection: #{connection} on #{connection.host}")
       rescue => e
         @@mutex.acquire_write_lock
-        @@cluster_info[lb_host].is_down = true
-        @@cluster_info[lb_host].down_since = Time.now.to_i
-        @@cluster_info[lb_host].count -= 1
-        if @@cluster_info[lb_host].count < 0
-          @@cluster_info[lb_host].count = 0
-          log_msg("DEBUG Negative count was reset to zero for #{lb_host}")
+        begin
+          @@cluster_info[lb_host].is_down = true
+          @@cluster_info[lb_host].down_since = Time.now.to_i
+          @@cluster_info[lb_host].count -= 1
+          if @@cluster_info[lb_host].count < 0
+            @@cluster_info[lb_host].count = 0
+            log_msg("DEBUG Negative count was reset to zero for #{lb_host}")
+          end
+        ensure
+          @@mutex.release_write_lock
         end
-        @@mutex.release_write_lock
         log_msg("Connection creation failed: #{e}")
       end
     end
