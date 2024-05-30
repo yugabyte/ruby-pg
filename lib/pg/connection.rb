@@ -76,22 +76,29 @@ class PG::Connection
 		hash_arg = args.last.is_a?( Hash ) ? args.pop.transform_keys(&:to_sym) : {}
 		log_msg("parse_connect_args() hash_arg: " + hash_arg.class.to_s + ", " + hash_arg.to_s)
 		iopts = {}
-		unless hash_arg.key?(:port)
+		if not hash_arg.empty? and not hash_arg.key?(:port)
 			log_msg "Setting port to 5433 in hash_arg"
 			hash_arg[:port] = 5433
 		end
 
+		lb_props = {}
 		if args.length == 1
 			case args.first.to_s
 			when /=/, /:\/\//
 				# Option or URL string style
+				log_msg "args.length == 1: Option or URL string style"
 				conn_string = args.first.to_s
+				# extract and parse lb properties from conn_string
+				conn_string, lb_props = parse_lb_args_from_url conn_string
+				log_msg "conn_string: #{conn_string}, lb_props: #{lb_props}"
 				iopts = PG::Connection.conninfo_parse(conn_string).each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }
 			else
 				# Positional parameters (only host given)
+				log_msg "args.length == 1: Positional parameters (only host given)"
 				iopts[CONNECT_ARGUMENT_ORDER.first.to_sym] = args.first
 			end
 		else
+			log_msg "args.length != 1"
 			# Positional parameters with host and more
 			max = CONNECT_ARGUMENT_ORDER.length
 			raise ArgumentError,
@@ -103,7 +110,7 @@ class PG::Connection
 			iopts.delete(:tty) # ignore obsolete tty parameter
 		end
 
-		lb_props = parse_connect_lb_args hash_arg
+		lb_props = parse_connect_lb_args hash_arg unless hash_arg.empty?
 
 		iopts.merge!( hash_arg )
 
@@ -112,6 +119,46 @@ class PG::Connection
 		end
 
 		return connect_hash_to_string(iopts), lb_props
+	end
+
+	def self.parse_lb_args_from_url(conn_string)
+		string_parts = conn_string.split('?', -1)
+		if string_parts.length != 2
+			return conn_string, nil
+		else
+			base_string = string_parts[0] + "?"
+			lb_props = Hash.new
+			tokens = string_parts[1].split('&', -1)
+			tokens.each {
+				|token|
+				unless token.empty?
+					k, v = token.split('=', 2)
+					case k
+					when "load_balance"
+						lb_props[:load_balance] = v
+					when "topology_keys"
+						lb_props[:topology_keys] = v
+					when "yb_servers_refresh_interval"
+						lb_props[:yb_servers_refresh_interval] = v
+					when "failed_host_reconnect_delay_secs"
+						lb_props[:failed_host_reconnect_delay_secs] = v
+					when "fallback_to_topology_keys_only"
+						lb_props[:fallback_to_topology_keys_only] = v
+					else
+						# not LB-specific
+						base_string << "#{k}=#{v}&"
+					end
+				end
+			}
+
+			base_string = base_string.chop if base_string[-1] == "&"
+			base_string = base_string.chop if base_string[-1] == "?"
+			if not lb_props.empty? and lb_props[:load_balance].to_s.downcase == "true"
+				return base_string, parse_connect_lb_args(lb_props)
+			else
+				return base_string, nil
+			end
+		end
 	end
 
 	def self.parse_connect_lb_args(hash_arg)

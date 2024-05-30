@@ -20,3 +20,5 @@
 /vendor/
 /lib/libpq.dll
 /lib/pg/postgresql_lib_path.rb
+/.idea/
+.irb_history
