@@ -4,15 +4,13 @@ require 'concurrent'
 
 class PG::LoadBalanceService
 
+  LBProperties = Struct.new(:placements_info, :refresh_interval, :fallback_to_tk_only, :failed_host_reconnect_delay)
   Node = Struct.new(:host, :port, :cloud, :region, :zone, :public_ip, :count, :is_down, :down_since)
+  CloudPlacement = Struct.new(:cloud, :region, :zone)
   @@mutex = Concurrent::ReentrantReadWriteLock.new
   @@last_refresh_time = -1
   @@control_connection = nil
   @@cluster_info = { }
-
-  def self.get_all_eligible_hosts(load_balancer)
-    # Implement this method
-  end
 
   def self.get_load(host)
     if @@cluster_info[host]
@@ -23,7 +21,6 @@ class PG::LoadBalanceService
   end
 
   def self.decrement_connection_count(host)
-    # log_msg "decrement_connection_count -------------- for #{host}"
     @@mutex.acquire_write_lock
     begin
       info = @@cluster_info[host]
@@ -187,7 +184,7 @@ class PG::LoadBalanceService
       region = row['region']
       zone = row['zone']
       public_ip = row['public_ip']
-      public_ip = resolve_host(public_ip) if public_ip
+      public_ip = resolve_host(public_ip)[0][0] if public_ip
 
       # todo set useHostColumn field
       log_msg("refreshing host: #{host} ...")
@@ -281,6 +278,129 @@ class PG::LoadBalanceService
       @@cluster_info[selected_node].count += 1
       Array[selected_node, @@cluster_info[selected_node].port, current_index]
     end
+  end
+
+  def self.parse_lb_args_from_url(conn_string)
+    string_parts = conn_string.split('?', -1)
+    if string_parts.length != 2
+      return conn_string, nil
+    else
+      base_string = string_parts[0] + "?"
+      lb_props = Hash.new
+      tokens = string_parts[1].split('&', -1)
+      tokens.each {
+        |token|
+        unless token.empty?
+          k, v = token.split('=', 2)
+          case k
+          when "load_balance"
+            lb_props[:load_balance] = v
+          when "topology_keys"
+            lb_props[:topology_keys] = v
+          when "yb_servers_refresh_interval"
+            lb_props[:yb_servers_refresh_interval] = v
+          when "failed_host_reconnect_delay_secs"
+            lb_props[:failed_host_reconnect_delay_secs] = v
+          when "fallback_to_topology_keys_only"
+            lb_props[:fallback_to_topology_keys_only] = v
+          else
+            # not LB-specific
+            base_string << "#{k}=#{v}&"
+          end
+        end
+      }
+
+      base_string = base_string.chop if base_string[-1] == "&"
+      base_string = base_string.chop if base_string[-1] == "?"
+      if not lb_props.empty? and lb_props[:load_balance].to_s.downcase == "true"
+        return base_string, parse_connect_lb_args(lb_props)
+      else
+        return base_string, nil
+      end
+    end
+  end
+
+  def self.parse_connect_lb_args(hash_arg)
+    lb = hash_arg.delete(:load_balance)
+    tk = hash_arg.delete(:topology_keys)
+    ri = hash_arg.delete(:yb_servers_refresh_interval)
+    ttl = hash_arg.delete(:failed_host_reconnect_delay_secs)
+    fb = hash_arg.delete(:fallback_to_topology_keys_only)
+
+    if lb && lb.to_s.downcase == "true"
+      lb_properties = LBProperties.new(nil, 300, false, 5)
+      if tk
+        lb_properties.placements_info = Hash.new
+        tk_parts = tk.split(',', -1)
+        tk_parts.each {
+          |single_tk|
+          if single_tk.empty?
+            raise ArgumentError, "Empty value for topology_keys specified"
+          end
+          single_tk_parts = single_tk.split(':', -1)
+          if single_tk_parts.length > 2
+            raise ArgumentError, "Invalid preference value '#{single_tk_parts}' specified for topology_keys: " + tk
+          end
+          cp = single_tk_parts[0].split('.', -1)
+          if cp.length != 3
+            raise ArgumentError, "Invalid cloud placement value '#{single_tk_parts[0]}' specified for topology_keys: " + tk
+          end
+          preference_value = 1
+          if single_tk_parts.length == 2
+            preference = single_tk_parts[1]
+            log_msg "preference value specified #{preference}"
+            if preference == ""
+              raise ArgumentError, "No preference value specified for topology_keys: " + tk
+            end
+            begin
+              preference_value = Integer(preference).to_i
+            rescue
+              raise ArgumentError, "Invalid preference value '#{preference}' for topology_keys: " + tk
+            ensure
+              if preference_value < 1 || preference_value > 10
+                raise ArgumentError, "Invalid preference value '#{preference_value}' for topology_keys: " + tk
+              end
+            end
+          end
+          unless lb_properties.placements_info[preference_value]
+            lb_properties.placements_info[preference_value] = Set.new
+          end
+          lb_properties.placements_info[preference_value] << CloudPlacement.new(cp[0], cp[1], cp[2])
+          log_msg "Added #{single_tk_parts[0]} at level #{preference_value} in placements_info"
+        }
+        log_msg "placements_info - #{lb_properties.placements_info}"
+      end
+
+      begin
+        lb_properties.refresh_interval = Integer(ri).to_i if ri
+      rescue ArgumentError => ae
+        puts "Invalid value for yb_servers_refresh_interval: #{ri}. Using the default value (300 seconds) instead."
+        lb_properties.refresh_interval = 300
+      ensure
+        if lb_properties.refresh_interval < 0 || lb_properties.refresh_interval > 600
+          log_msg("Invalid value for yb_servers_refresh_interval: #{lb_properties.refresh_interval}. Using the default value (300 seconds) instead.")
+          lb_properties.refresh_interval = 300
+        end
+      end
+
+      begin
+        lb_properties.failed_host_reconnect_delay = Integer(ttl).to_i if ttl
+      rescue ArgumentError
+        log_msg("Invalid value for failed_host_reconnect_delay_secs: #{ttl}. Using the default value (5 seconds) instead.")
+      ensure
+        if lb_properties.failed_host_reconnect_delay < 0 || lb_properties.failed_host_reconnect_delay > 60
+          log_msg("Invalid value for failed_host_reconnect_delay_secs: #{lb_properties.failed_host_reconnect_delay}. Using the default value (5 seconds) instead.")
+          lb_properties.failed_host_reconnect_delay = 5
+        end
+      end
+
+      lb_properties.fallback_to_tk_only = fb.to_s.downcase == "true" if fb
+
+      log_msg("parse_connect_args() LB properties: #{lb_properties}")
+    else
+      lb_properties = nil
+    end
+    lb_properties
   end
 
   def self.metadata_needs_refresh(refresh_interval)

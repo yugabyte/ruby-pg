@@ -32,8 +32,6 @@ class PG::Connection
 
 	# The order the options are passed to the ::connect method.
 	CONNECT_ARGUMENT_ORDER = %w[host port options tty dbname user password load_balance topology_keys yb_servers_refresh_interval fallback_to_topology_keys_only failed_host_reconnect_delay_secs].freeze
-	LBProperties = Struct.new(:placements_info, :refresh_interval, :fallback_to_tk_only, :failed_host_reconnect_delay)
-	CloudPlacement = Struct.new(:cloud, :region, :zone)
 	private_constant :CONNECT_ARGUMENT_ORDER
 
 	### Quote a single +value+ for use in a connection-parameter string.
@@ -89,7 +87,7 @@ class PG::Connection
 				log_msg "args.length == 1: Option or URL string style"
 				conn_string = args.first.to_s
 				# extract and parse lb properties from conn_string
-				conn_string, lb_props = parse_lb_args_from_url conn_string
+				conn_string, lb_props = PG::LoadBalanceService.parse_lb_args_from_url conn_string
 				log_msg "conn_string: #{conn_string}, lb_props: #{lb_props}"
 				iopts = PG::Connection.conninfo_parse(conn_string).each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }
 			else
@@ -110,7 +108,7 @@ class PG::Connection
 			iopts.delete(:tty) # ignore obsolete tty parameter
 		end
 
-		lb_props = parse_connect_lb_args hash_arg unless hash_arg.empty?
+		lb_props = PG::LoadBalanceService.parse_connect_lb_args hash_arg unless hash_arg.empty?
 
 		iopts.merge!( hash_arg )
 
@@ -119,129 +117,6 @@ class PG::Connection
 		end
 
 		return connect_hash_to_string(iopts), lb_props
-	end
-
-	def self.parse_lb_args_from_url(conn_string)
-		string_parts = conn_string.split('?', -1)
-		if string_parts.length != 2
-			return conn_string, nil
-		else
-			base_string = string_parts[0] + "?"
-			lb_props = Hash.new
-			tokens = string_parts[1].split('&', -1)
-			tokens.each {
-				|token|
-				unless token.empty?
-					k, v = token.split('=', 2)
-					case k
-					when "load_balance"
-						lb_props[:load_balance] = v
-					when "topology_keys"
-						lb_props[:topology_keys] = v
-					when "yb_servers_refresh_interval"
-						lb_props[:yb_servers_refresh_interval] = v
-					when "failed_host_reconnect_delay_secs"
-						lb_props[:failed_host_reconnect_delay_secs] = v
-					when "fallback_to_topology_keys_only"
-						lb_props[:fallback_to_topology_keys_only] = v
-					else
-						# not LB-specific
-						base_string << "#{k}=#{v}&"
-					end
-				end
-			}
-
-			base_string = base_string.chop if base_string[-1] == "&"
-			base_string = base_string.chop if base_string[-1] == "?"
-			if not lb_props.empty? and lb_props[:load_balance].to_s.downcase == "true"
-				return base_string, parse_connect_lb_args(lb_props)
-			else
-				return base_string, nil
-			end
-		end
-	end
-
-	def self.parse_connect_lb_args(hash_arg)
-		lb = hash_arg.delete(:load_balance)
-		tk = hash_arg.delete(:topology_keys)
-		ri = hash_arg.delete(:yb_servers_refresh_interval)
-		ttl = hash_arg.delete(:failed_host_reconnect_delay_secs)
-		fb = hash_arg.delete(:fallback_to_topology_keys_only)
-
-		if lb && lb.to_s.downcase == "true"
-			lb_properties = LBProperties.new(nil, 300, false, 5)
-			if tk
-				lb_properties.placements_info = Hash.new
-				tk_parts = tk.split(',', -1)
-				tk_parts.each {
-					|single_tk|
-					if single_tk.empty?
-						raise ArgumentError, "Empty value for topology_keys specified"
-					end
-					single_tk_parts = single_tk.split(':', -1)
-					if single_tk_parts.length > 2
-						raise ArgumentError, "Invalid preference value '#{single_tk_parts}' specified for topology_keys: " + tk
-					end
-					cp = single_tk_parts[0].split('.', -1)
-					if cp.length != 3
-						raise ArgumentError, "Invalid cloud placement value '#{single_tk_parts[0]}' specified for topology_keys: " + tk
-					end
-					preference_value = 1
-					if single_tk_parts.length == 2
-						preference = single_tk_parts[1]
-						log_msg "preference value specified #{preference}"
-						if preference == ""
-							raise ArgumentError, "No preference value specified for topology_keys: " + tk
-						end
-						begin
-							preference_value = Integer(preference).to_i
-						rescue
-							raise ArgumentError, "Invalid preference value '#{preference}' for topology_keys: " + tk
-						ensure
-							if preference_value < 1 || preference_value > 10
-								raise ArgumentError, "Invalid preference value '#{preference_value}' for topology_keys: " + tk
-							end
-						end
-					end
-					unless lb_properties.placements_info[preference_value]
-						lb_properties.placements_info[preference_value] = Set.new
-					end
-					lb_properties.placements_info[preference_value] << CloudPlacement.new(cp[0], cp[1], cp[2])
-					log_msg "Added #{single_tk_parts[0]} at level #{preference_value} in placements_info"
-				}
-				log_msg "placements_info - #{lb_properties.placements_info}"
-			end
-
-			begin
-				lb_properties.refresh_interval = Integer(ri).to_i if ri
-			rescue ArgumentError => ae
-				puts "Invalid value for yb_servers_refresh_interval: #{ri}. Using the default value (300 seconds) instead."
-				lb_properties.refresh_interval = 300
-			ensure
-				if lb_properties.refresh_interval < 0 || lb_properties.refresh_interval > 600
-					log_msg("Invalid value for yb_servers_refresh_interval: #{lb_properties.refresh_interval}. Using the default value (300 seconds) instead.")
-					lb_properties.refresh_interval = 300
-				end
-			end
-
-			begin
-				lb_properties.failed_host_reconnect_delay = Integer(ttl).to_i if ttl
-			rescue ArgumentError
-				log_msg("Invalid value for failed_host_reconnect_delay_secs: #{ttl}. Using the default value (5 seconds) instead.")
-			ensure
-				if lb_properties.failed_host_reconnect_delay < 0 || lb_properties.failed_host_reconnect_delay > 60
-					log_msg("Invalid value for failed_host_reconnect_delay_secs: #{lb_properties.failed_host_reconnect_delay}. Using the default value (5 seconds) instead.")
-					lb_properties.failed_host_reconnect_delay = 5
-				end
-			end
-
-			lb_properties.fallback_to_tk_only = fb.to_s.downcase == "true" if fb
-
-			log_msg("parse_connect_args() LB properties: #{lb_properties}")
-		else
-			lb_properties = nil
-		end
-		lb_properties
 	end
 
 	# Return a String representation of the object suitable for debugging.
@@ -1006,25 +881,6 @@ class PG::Connection
 
 		private def log_msg(msg)
 			puts "-----> " + msg
-		end
-
-		private def resolve_host(mhost)
-			if host_is_named_pipe?(mhost)
-				# No hostname to resolve (UnixSocket)
-				hostaddrs = [nil]
-			else
-				if Fiber.respond_to?(:scheduler) &&
-					Fiber.scheduler &&
-					RUBY_VERSION < '3.1.'
-
-					# Use a second thread to avoid blocking of the scheduler.
-					# `TCPSocket.gethostbyname` isn't fiber aware before ruby-3.1.
-					hostaddrs = Thread.new { Addrinfo.getaddrinfo(mhost, nil, nil, :STREAM).map(&:ip_address) rescue [''] }.value
-				else
-					hostaddrs = Addrinfo.getaddrinfo(mhost, nil, nil, :STREAM).map(&:ip_address) rescue ['']
-				end
-			end
-			hostaddrs.map { |hostaddr| [hostaddr, mhost] }
 		end
 
 		def host_is_named_pipe?(host_string)
