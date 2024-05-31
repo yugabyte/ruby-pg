@@ -27,11 +27,9 @@ class PG::LoadBalanceService
       info = @@cluster_info[host]
       unless info.nil?
         info.count -= 1
-        log_msg "DEBUG Decremented connection count for #{host} by one. Latest count: #{info.count}"
         if info.count < 0
           # Can go negative if we are here because of a connection that was created in a non-LB fashion
           info.count = 0
-          log_msg "DEBUG Resetting connection count for #{host} to zero."
         end
         return true
       end
@@ -50,35 +48,27 @@ class PG::LoadBalanceService
           if @@control_connection == nil
             @@control_connection = create_control_connection(iopts)
           end
-          log_msg("control conn #{@@control_connection} on #{@@control_connection.host}")
           begin
             refresh_yb_servers(lb_props.failed_host_reconnect_delay, @@control_connection)
             refresh_done = true
-            log_msg("Refreshed info from yb_servers(): #{@@cluster_info}")
           rescue => err
-            log_msg "Failed to refresh yb_servers() info with control connection on #{@@control_connection.host} - #{err}, trying with new control connection"
             if iopts[:host] == @@control_connection.host
               if @@cluster_info[iopts[:host]]
                 @@cluster_info[iopts[:host]].is_down = true
                 @@cluster_info[iopts[:host]].down_since = Time.now.to_i
               end
 
-              log_msg "cluster info: " + @@cluster_info.to_s
               new_list = @@cluster_info.select {|k, v| !v.is_down }
               if new_list.length > 0
                 h = new_list.keys.first
                 iopts[:port] = new_list[h].port
                 iopts[:host] = h
-                log_msg "new selected node: #{h} and updated iopts = #{iopts}"
               else
-                log_msg "Unable to create a control connection"
                 return nil
                 # raise(PG::Error, "Unable to create a control connection")
               end
             end
-            log_msg "retrying control connection with iopts: " + iopts.to_s
             @@control_connection = create_control_connection(iopts)
-            log_msg("control conn #{@@control_connection} created on #{@@control_connection.host}")
           end
         end
       end
@@ -97,14 +87,12 @@ class PG::LoadBalanceService
         @@mutex.release_write_lock
       end
       unless host_port
-        log_msg "No hosts available"
         break
       end
       lb_host = host_port[0]
       lb_port = host_port[1]
       placement_index = host_port[2]
       if lb_host.empty?
-        log_msg "No hosts available"
         break
       end
       # modify iopts args
@@ -112,10 +100,8 @@ class PG::LoadBalanceService
         iopts[:host] = lb_host
         iopts[:port] = lb_port
         # iopts = resolve_hosts(iopts)
-        log_msg("iopts before creating a connection: " + iopts.to_s + ", iopts class: " + iopts.class.to_s)
         connection = PG.connect(iopts)
         success = true
-        log_msg("user connection: #{connection} on #{connection.host}")
       rescue => e
         @@mutex.acquire_write_lock
         begin
@@ -124,12 +110,10 @@ class PG::LoadBalanceService
           @@cluster_info[lb_host].count -= 1
           if @@cluster_info[lb_host].count < 0
             @@cluster_info[lb_host].count = 0
-            log_msg("DEBUG Negative count was reset to zero for #{lb_host}")
           end
         ensure
           @@mutex.release_write_lock
         end
-        log_msg("Connection creation failed: #{e}")
       end
     end
     connection
@@ -141,27 +125,19 @@ class PG::LoadBalanceService
     # Iterate until control connection is successful or all nodes are tried
     until success
       begin
-        log_msg("Attempting control connection ... #{iopts}")
         conn = PG.connect(iopts)
-        # log_msg "connection members = " + conn.instance_variables.to_s
-        # log_msg "connection methods = " + (conn.methods - Object.methods).to_s
         success = true
-        log_msg("Returning control connection: #{conn}")
       rescue => e
-        log_msg "Creating control connection failed with #{e}"
-        # @@cluster_info[]
         if @@cluster_info[iopts[:host]]
           @@cluster_info[iopts[:host]].is_down = true
           @@cluster_info[iopts[:host]].down_since = Time.now.to_i
         end
 
-        log_msg "retrying with cluster info: " + @@cluster_info.to_s
         new_list = @@cluster_info.select {|k, v| !v.is_down }
         if new_list.length > 0
           h = new_list.keys.first
           iopts[:port] = new_list[h].port
           iopts[:host] = h
-          log_msg "new selected node: #{h} and updated iopts = #{iopts}"
         else
           raise(PG::Error, "Unable to create a control connection")
         end
@@ -170,13 +146,7 @@ class PG::LoadBalanceService
     conn
   end
 
-  def self.log_msg(msg)
-    puts "-----> " + msg
-  end
-
   def self.refresh_yb_servers(failed_host_reconnect_delay_secs, conn)
-    log_msg("Refreshing yb_servers() on #{conn}")  #", methods: #{conn.methods.sort}"
-    # conninfo, host, close, lo_close, loclose
     rs = conn.exec("select * from yb_servers()")
     found_public_ip = false
     rs.each do |row|
@@ -196,27 +166,20 @@ class PG::LoadBalanceService
       if @@useHostColumn.nil?
         if host.eql? conn.host
           @@useHostColumn = true
-          log_msg "Using host column"
         end
         if !public_ip.nil? && (public_ip.eql? conn.host)
           @@useHostColumn = false
-          log_msg "Using public_ip column"
         end
       end
-      log_msg("refreshing host: #{host} ...")
       old = @@cluster_info[host]
       if old
-        log_msg("host entry already present")
         if old.is_down
           if Time.now.to_i - old.down_since > failed_host_reconnect_delay_secs
             old.is_down = false
-          else
-            log_msg("host entry already present, but recently marked as down")
           end
           @@cluster_info[host] = old
         end
       else
-        log_msg("creating new host entry ...")
         node = Node.new(host, port, cloud, region, zone, public_ip, 0, false, 0)
         @@cluster_info[host] = node
       end
@@ -224,19 +187,15 @@ class PG::LoadBalanceService
     if @@useHostColumn.nil?
       if found_public_ip
         @@useHostColumn = false
-      else
-        log_msg "No node addresses match with the given host #{conn.host}"
       end
     end
     @@last_refresh_time = Time.now.to_i
-    log_msg("cluster_info: " + @@cluster_info.to_s)
   end
 
   def self.get_least_loaded_server(allowed_placements, fallback_to_tk_only, new_request, placement_index)
     current_index = 1
     selected = Array.new
     unless allowed_placements.nil? # topology-aware
-      log_msg "topology keys given #{allowed_placements}, new? #{new_request}, placement index #{placement_index}"
       eligible_hosts = Array.new
       (placement_index..10).each { |idx|
         current_index = idx
@@ -246,17 +205,13 @@ class PG::LoadBalanceService
           unless node_info.is_down
             unless allowed_placements[idx].nil?
               allowed_placements[idx].each do |cp|
-                log_msg "checking #{host} with cp: #{cp[0]}, #{cp[1]}, #{cp[2]}"
                 if cp[0] == node_info.cloud && cp[1] == node_info.region && (cp[2] == node_info.zone || cp[2] == "*")
-                  log_msg "eligible host #{host}"
                   eligible_hosts << host
                   if node_info.count < min_connections
                     min_connections = node_info.count
                     selected.clear
-                    log_msg "Found new least loaded host: #{host} - #{node_info.count}"
                     selected.push(host)
                   elsif node_info.count == min_connections
-                    log_msg "Found another least loaded host: #{host} - #{node_info.count}"
                     selected.push(host)
                   end
                   break # Move to the next node
@@ -265,7 +220,6 @@ class PG::LoadBalanceService
             end
           end
         end
-        log_msg "Found #{selected.length} hosts in level #{idx} with least load"
         if selected.length > 0
           break
         end
@@ -274,7 +228,6 @@ class PG::LoadBalanceService
 
     if allowed_placements.nil? || (selected.empty? && !fallback_to_tk_only) # cluster-aware || fallback_to_tk_only = false
       unless allowed_placements.nil?
-        log_msg "Falling back to rest of the cluster"
       end
       min_connections = 1000000 # Using some really high value
       selected = Array.new
@@ -292,12 +245,10 @@ class PG::LoadBalanceService
     end
 
     if selected.empty?
-      log_msg "returning nil from get_least_loaded_server()"
       nil
     else
       index = rand(selected.size)
       selected_node = selected[index]
-      log_msg("least loaded host: #{selected_node}")
       @@cluster_info[selected_node].count += 1
       if !@@useHostColumn.nil? && !@@useHostColumn
         selected_node = @@cluster_info[selected_node].public_ip
@@ -374,7 +325,6 @@ class PG::LoadBalanceService
           preference_value = 1
           if single_tk_parts.length == 2
             preference = single_tk_parts[1]
-            log_msg "preference value specified #{preference}"
             if preference == ""
               raise ArgumentError, "No preference value specified for topology_keys: " + tk
             end
@@ -392,19 +342,15 @@ class PG::LoadBalanceService
             lb_properties.placements_info[preference_value] = Set.new
           end
           lb_properties.placements_info[preference_value] << CloudPlacement.new(cp[0], cp[1], cp[2])
-          log_msg "Added #{single_tk_parts[0]} at level #{preference_value} in placements_info"
         }
-        log_msg "placements_info - #{lb_properties.placements_info}"
       end
 
       begin
         lb_properties.refresh_interval = Integer(ri).to_i if ri
       rescue ArgumentError => ae
-        log_msg "Invalid value for yb_servers_refresh_interval: #{ri}. Using the default value (300 seconds) instead."
         lb_properties.refresh_interval = 300
       ensure
         if lb_properties.refresh_interval < 0 || lb_properties.refresh_interval > 600
-          log_msg("Invalid value for yb_servers_refresh_interval: #{lb_properties.refresh_interval}. Using the default value (300 seconds) instead.")
           lb_properties.refresh_interval = 300
         end
       end
@@ -412,17 +358,14 @@ class PG::LoadBalanceService
       begin
         lb_properties.failed_host_reconnect_delay = Integer(ttl).to_i if ttl
       rescue ArgumentError
-        log_msg("Invalid value for failed_host_reconnect_delay_secs: #{ttl}. Using the default value (5 seconds) instead.")
       ensure
         if lb_properties.failed_host_reconnect_delay < 0 || lb_properties.failed_host_reconnect_delay > 60
-          log_msg("Invalid value for failed_host_reconnect_delay_secs: #{lb_properties.failed_host_reconnect_delay}. Using the default value (5 seconds) instead.")
           lb_properties.failed_host_reconnect_delay = 5
         end
       end
 
       lb_properties.fallback_to_tk_only = fb.to_s.downcase == "true" if fb
 
-      log_msg("parse_connect_args() LB properties: #{lb_properties}")
     else
       lb_properties = nil
     end
@@ -430,12 +373,9 @@ class PG::LoadBalanceService
   end
 
   def self.metadata_needs_refresh(refresh_interval)
-    log_msg("now: #{Time.now.to_i},  last refresh time: #{@@last_refresh_time}")
     if Time.now.to_i - @@last_refresh_time >= refresh_interval # || force_refresh == true
-      log_msg("Time to refresh yb_servers()")
       true
     else
-      log_msg("No refresh of yb_servers() needed")
       false
     end
   end

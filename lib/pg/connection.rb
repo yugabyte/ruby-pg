@@ -68,14 +68,9 @@ class PG::Connection
 	end
 
 	def self.parse_connect_args_and_return_lb_props( *args )
-		log_msg "#{Thread.current}] parse_connect_args() args.length: #{args.length}, class: #{args.class}, #{args}"
-		# log_msg("parse_connect_args() args.last: " + args.last.to_s)
-		# log_msg("parse_connect_args() args.last is a hash?: " + args.last.is_a?( Hash ).to_s)
 		hash_arg = args.last.is_a?( Hash ) ? args.pop.transform_keys(&:to_sym) : {}
-		log_msg("parse_connect_args() hash_arg: " + hash_arg.class.to_s + ", " + hash_arg.to_s)
 		iopts = {}
 		if not hash_arg.empty? and not hash_arg.key?(:port)
-			log_msg "Setting port to 5433 in hash_arg"
 			hash_arg[:port] = 5433
 		end
 
@@ -84,19 +79,15 @@ class PG::Connection
 			case args.first.to_s
 			when /=/, /:\/\//
 				# Option or URL string style
-				log_msg "args.length == 1: Option or URL string style"
 				conn_string = args.first.to_s
 				# extract and parse lb properties from conn_string
 				conn_string, lb_props = PG::LoadBalanceService.parse_lb_args_from_url conn_string
-				log_msg "conn_string: #{conn_string}, lb_props: #{lb_props}"
 				iopts = PG::Connection.conninfo_parse(conn_string).each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }
 			else
 				# Positional parameters (only host given)
-				log_msg "args.length == 1: Positional parameters (only host given)"
 				iopts[CONNECT_ARGUMENT_ORDER.first.to_sym] = args.first
 			end
 		else
-			log_msg "args.length != 1"
 			# Positional parameters with host and more
 			max = CONNECT_ARGUMENT_ORDER.length
 			raise ArgumentError,
@@ -839,24 +830,18 @@ class PG::Connection
 			option_string, lb_properties = parse_connect_args_and_return_lb_props(*args)
 			iopts = PG::Connection.conninfo_parse(option_string).each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }
 			iopts = PG::Connection.conndefaults.each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }.merge(iopts)
-			log_msg("iopts class " + iopts.class.to_s + ", iopts " + iopts.to_s)
 			original_host = iopts[:host]
 			original_port = iopts[:port]
 
 			if lb_properties
-				log_msg("load_balance is enabled")
 				connection = PG::LoadBalanceService.connect_to_lb_hosts(lb_properties, iopts)
 			end
 			if connection.nil?
 				if lb_properties
-					log_msg "load balance failed, original_host = #{original_host}"
 					iopts[:host] = original_host
 					iopts[:port] = original_port
-				else
-					log_msg "load_balance disabled"
 				end
 				connection = do_connect_to_hosts(iopts)
-				log_msg "created regular connection to #{connection.host}"
 			end
 			connection
 		end
@@ -877,10 +862,6 @@ class PG::Connection
 
 			conn.send(:async_connect_or_reset, :connect_poll)
 			conn
-		end
-
-		private def log_msg(msg)
-			puts "-----> " + msg
 		end
 
 		def host_is_named_pipe?(host_string)

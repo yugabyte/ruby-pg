@@ -1,4 +1,70 @@
-# pg
+# pg_yugabytedb
+
+This is a fork of [Ruby interface to the PostgreSQL RDBMS](https://github.com/ged/ruby-pg) to develop a Ruby interface to YugabyteDB.
+
+## Features
+
+This driver has the following features:
+
+### Cluster Awareness to eliminate need for a load balancer
+
+This driver requires only an initial _contact point_ for the YugabyteDB cluster, using which it discovers the rest of the nodes. Additionally, it automatically learns about the nodes being started/added or stopped/removed. Internally the driver keeps track of number of connections it has created to each server endpoint and every new connection request is connected to the least loaded server as per the driver's view.
+
+### Topology Awareness to enable geo-distributed apps
+
+This is similar to 'Cluster Awareness' but uses those servers which are part of a given set of geo-locations specified by _topology_keys_.
+
+### Connection Properties added for load balancing
+
+- _load_balance_   - It expects **true/false** as its possible values. The 'load_balance' property needs to be set to 'true' to enable cluster-awareness.
+- _topology_keys_  - It takes a comma separated geo-location values. A single geo-location can be given as 'cloud.region.zone'. Multiple geo-locations too can be specified, separated by comma (`,`). Optionally, you can also register your preference for particular geo-locations by appending the preference value with prefix `:`. For example, `cloud.regionA.zoneA:1,cloud.regionA.zoneB:2`.
+- _yb_servers_refresh_interval_ - Minimum time interval, in seconds, between two attempts to refresh the information about cluster nodes. This is checked only when a new connection is requested. Default is 300. Valid values are integers between 0 and 600. Value 0 means refresh for each connection request. Any value outside this range is ignored and the default is used.
+- _fallback_to_topology_keys_only_ - When set to true, the driver does not attempt to connect to nodes outside of the geo-locations specified via _topology_keys_. Default value is false.
+- _failed_host_reconnect_delay_secs_ - The time interval for which the driver ignores a failed node even if it shows up in refreshed metadata from `yb_servers()` function. Default value is 5 seconds.
+
+Please refer to the [Use the Driver](#Use the Driver) section for examples.
+
+## Use the Driver
+
+- Passing new connection properties for load balancing in connection url
+
+  For uniform load balancing across all the server you just need to specify the _load_balance=true_ property in the url.
+    ```
+    yburl = "postgresql://yugabyte:yugabyte@127.0.0.1:5433/yugabyte?load_balance=true"
+    connection = PG.connect(url)
+    ```
+
+  For specifying topology keys you need to set the additional property with a valid comma separated value.
+
+    ```
+    yburl = "postgresql://yugabyte:yugabyte@127.0.0.1:5433/yugabyte?load_balance=true&topology_keys=cloud.regionA.zoneA,cloud.regionA.zoneB"
+    connection = PG.connect(url)
+    ```
+
+### Specifying fallback zones
+
+For topology-aware load balancing, you can specify fallback placements too. This is not applicable for cluster-aware load balancing.
+Each placement value can be suffixed with a colon (`:`) followed by a preference value between 1 and 10.
+A preference value of `:1` means it is a primary placement. A preference value of `:2` means it is the first fallback placement and so on.
+If no preference value is provided, it is considered to be a primary placement (equivalent to one with preference value `:1`). Example given below.
+
+```
+yburl = "postgresql://yugabyte:yugabyte@127.0.0.1:5433/yugabyte?load_balance=true&topology_keys=cloud.regionA.zoneA:1,cloud.regionA.zoneB:2"
+
+```
+
+You can also use `*` for specifying all the zones in a given region as shown below. This is not allowed for cloud or region values.
+
+```
+yburl = "postgresql://yugabyte:yugabyte@127.0.0.1:5433/yugabyte?load_balance=true&topology_keys=cloud.regionA.*:1,cloud.regionB.*:2";
+```
+
+The driver attempts connection to servers in the first fallback placement(s) if it does not find any servers available in the primary placement(s). If no servers are available in the first fallback placement(s),
+then it attempts to connect to servers in the second fallback placement(s), if specified. This continues until the driver finds a server to connect to, else an error is returned to the application.
+And this repeats for each connection request.
+
+
+Rest of the README is from upstream repository.
 
 * home :: https://github.com/ged/ruby-pg
 * docs :: http://deveiate.org/code/pg (English) ,
