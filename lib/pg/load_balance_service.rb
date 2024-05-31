@@ -11,6 +11,7 @@ class PG::LoadBalanceService
   @@last_refresh_time = -1
   @@control_connection = nil
   @@cluster_info = { }
+  @@useHostColumn = nil
 
   def self.get_load(host)
     if @@cluster_info[host]
@@ -26,11 +27,11 @@ class PG::LoadBalanceService
       info = @@cluster_info[host]
       unless info.nil?
         info.count -= 1
-        puts "DEBUG Decremented connection count for #{host} by one. Latest count: #{info.count}"
+        log_msg "DEBUG Decremented connection count for #{host} by one. Latest count: #{info.count}"
         if info.count < 0
           # Can go negative if we are here because of a connection that was created in a non-LB fashion
           info.count = 0
-          puts "DEBUG Resetting connection count for #{host} to zero."
+          log_msg "DEBUG Resetting connection count for #{host} to zero."
         end
         return true
       end
@@ -70,8 +71,9 @@ class PG::LoadBalanceService
                 iopts[:host] = h
                 log_msg "new selected node: #{h} and updated iopts = #{iopts}"
               else
-                # return nil
-                raise(PG::Error, "Unable to create a control connection")
+                log_msg "Unable to create a control connection"
+                return nil
+                # raise(PG::Error, "Unable to create a control connection")
               end
             end
             log_msg "retrying control connection with iopts: " + iopts.to_s
@@ -176,6 +178,7 @@ class PG::LoadBalanceService
     log_msg("Refreshing yb_servers() on #{conn}")  #", methods: #{conn.methods.sort}"
     # conninfo, host, close, lo_close, loclose
     rs = conn.exec("select * from yb_servers()")
+    found_public_ip = false
     rs.each do |row|
       # Take the first address of resolved host addresses
       host = resolve_host(row['host'])[0][0] # 2D array
@@ -185,8 +188,21 @@ class PG::LoadBalanceService
       zone = row['zone']
       public_ip = row['public_ip']
       public_ip = resolve_host(public_ip)[0][0] if public_ip
+      if not public_ip.nil? and not public_ip.empty?
+        found_public_ip = true
+      end
 
       # todo set useHostColumn field
+      if @@useHostColumn.nil?
+        if host.eql? conn.host
+          @@useHostColumn = true
+          log_msg "Using host column"
+        end
+        if !public_ip.nil? && (public_ip.eql? conn.host)
+          @@useHostColumn = false
+          log_msg "Using public_ip column"
+        end
+      end
       log_msg("refreshing host: #{host} ...")
       old = @@cluster_info[host]
       if old
@@ -203,6 +219,13 @@ class PG::LoadBalanceService
         log_msg("creating new host entry ...")
         node = Node.new(host, port, cloud, region, zone, public_ip, 0, false, 0)
         @@cluster_info[host] = node
+      end
+    end
+    if @@useHostColumn.nil?
+      if found_public_ip
+        @@useHostColumn = false
+      else
+        log_msg "No node addresses match with the given host #{conn.host}"
       end
     end
     @@last_refresh_time = Time.now.to_i
@@ -276,6 +299,9 @@ class PG::LoadBalanceService
       selected_node = selected[index]
       log_msg("least loaded host: #{selected_node}")
       @@cluster_info[selected_node].count += 1
+      if !@@useHostColumn.nil? && !@@useHostColumn
+        selected_node = @@cluster_info[selected_node].public_ip
+      end
       Array[selected_node, @@cluster_info[selected_node].port, current_index]
     end
   end
@@ -374,7 +400,7 @@ class PG::LoadBalanceService
       begin
         lb_properties.refresh_interval = Integer(ri).to_i if ri
       rescue ArgumentError => ae
-        puts "Invalid value for yb_servers_refresh_interval: #{ri}. Using the default value (300 seconds) instead."
+        log_msg "Invalid value for yb_servers_refresh_interval: #{ri}. Using the default value (300 seconds) instead."
         lb_properties.refresh_interval = 300
       ensure
         if lb_properties.refresh_interval < 0 || lb_properties.refresh_interval > 600
