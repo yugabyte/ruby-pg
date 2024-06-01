@@ -1,15 +1,15 @@
 # -*- ruby -*-
 
-require 'pg'
+require 'yugabyte_ysql'
 
-c = PG.connect( dbname: 'test' )
+c = YugabyteYSQL.connect(dbname: 'test' )
 
 # this one works:
 c.exec( "DROP TABLE IF EXISTS foo" )
 c.exec( "CREATE TABLE foo (strings character varying[]);" )
 
 # But using a prepared statement works:
-c.set_error_verbosity( PG::PQERRORS_VERBOSE )
+c.set_error_verbosity(YugabyteYSQL::PQERRORS_VERBOSE )
 c.prepare( 'stmt', "INSERT INTO foo VALUES ($1);" )
 
 # This won't work

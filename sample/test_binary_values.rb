@@ -1,8 +1,8 @@
 # -*- ruby -*-1.9.1
 
-require 'pg'
+require 'yugabyte_ysql'
 
-db = PG.connect( :dbname => 'test' )
+db = YugabyteYSQL.connect(:dbname => 'test' )
 db.exec "DROP TABLE IF EXISTS test"
 db.exec "CREATE TABLE test (a INTEGER, b BYTEA)"
 

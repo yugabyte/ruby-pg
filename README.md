@@ -80,20 +80,21 @@ Pg is the Ruby interface to the [PostgreSQL RDBMS](http://www.postgresql.org/).
 It works with [PostgreSQL 9.3 and later](http://www.postgresql.org/support/versioning/).
 
 A small example usage:
+
 ```ruby
   #!/usr/bin/env ruby
 
-  require 'pg'
+require 'pg'
 
-  # Output a table of current connections to the DB
-  conn = PG.connect( dbname: 'sales' )
-  conn.exec( "SELECT * FROM pg_stat_activity" ) do |result|
-    puts "     PID | User             | Query"
-    result.each do |row|
-      puts " %7d | %-16s | %s " %
-        row.values_at('pid', 'usename', 'query')
-    end
+# Output a table of current connections to the DB
+conn = YugabyteYSQL.connect(dbname: 'sales')
+conn.exec("SELECT * FROM pg_stat_activity") do |result|
+  puts "     PID | User             | Query"
+  result.each do |row|
+    puts " %7d | %-16s | %s " %
+                 row.values_at('pid', 'usename', 'query')
   end
+end
 ```
 
 ## Build Status
@@ -159,16 +160,17 @@ because String allocations are reduced and conversions in (slower) Ruby code
 can be omitted.
 
 Very basic type casting can be enabled by:
-```ruby
-    conn.type_map_for_results = PG::BasicTypeMapForResults.new conn
-    # ... this works for result value mapping:
-    conn.exec("select 1, now(), '{2,3}'::int[]").values
-        # => [[1, 2014-09-21 20:51:56 +0200, [2, 3]]]
 
-    conn.type_map_for_queries = PG::BasicTypeMapForQueries.new conn
-    # ... and this for param value mapping:
-    conn.exec_params("SELECT $1::text, $2::text, $3::text", [1, 1.23, [2,3]]).values
-        # => [["1", "1.2300000000000000E+00", "{2,3}"]]
+```ruby
+    conn.type_map_for_results = YugabyteYSQL::BasicTypeMapForResults.new conn
+# ... this works for result value mapping:
+conn.exec("select 1, now(), '{2,3}'::int[]").values
+# => [[1, 2014-09-21 20:51:56 +0200, [2, 3]]]
+
+conn.type_map_for_queries = YugabyteYSQL::BasicTypeMapForQueries.new conn
+# ... and this for param value mapping:
+conn.exec_params("SELECT $1::text, $2::text, $3::text", [1, 1.23, [2, 3]]).values
+# => [["1", "1.2300000000000000E+00", "{2,3}"]]
 ```
 
 But Pg's type casting is highly customizable. That's why it's divided into

@@ -41,7 +41,7 @@ require 'ostruct'
 require 'optparse'
 require 'pathname'
 require 'etc'
-require 'pg'
+require 'yugabyte_ysql'
 
 
 ### A tablespace migration class.
@@ -50,7 +50,7 @@ class PGWarehouse
 
 	def initialize( opts )
 		@opts = opts
-		@db = PG.connect(
+		@db = YugabyteYSQL.connect(
 			:dbname   => opts.database,
 			:host     => opts.host,
 			:port     => opts.port,

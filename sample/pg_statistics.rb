@@ -16,7 +16,7 @@
 require 'ostruct'
 require 'optparse'
 require 'etc'
-require 'pg'
+require 'yugabyte_ysql'
 
 
 ### PostgreSQL Stats.  Fetch information from pg_stat_* tables.
@@ -27,7 +27,7 @@ class Stats
 
 	def initialize( opts )
 		@opts = opts
-		@db   = PG.connect(
+		@db   = YugabyteYSQL.connect(
 			:dbname   => opts.database,
 			:host     => opts.host,
 			:port     => opts.port,

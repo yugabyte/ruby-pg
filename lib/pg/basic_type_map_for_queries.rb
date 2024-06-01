@@ -1,7 +1,7 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-require 'pg' unless defined?( PG )
+require 'yugabyte_ysql' unless defined?( YugabyteYSQL )
 
 # Simple set of rules for type casting common Ruby types to PostgreSQL.
 #
@@ -21,7 +21,7 @@ require 'pg' unless defined?( PG )
 #   # Execute a query. The Integer param value is typecasted internally by PG::BinaryEncoder::Int8.
 #   # The format of the parameter is set to 0 (text) and the OID of this parameter is set to 20 (int8).
 #   res = conn.exec_params( "SELECT $1", [5] )
-class PG::BasicTypeMapForQueries < PG::TypeMapByClass
+class YugabyteYSQL::BasicTypeMapForQueries < YugabyteYSQL::TypeMapByClass
 	# Helper class for submission of binary strings into bytea columns.
 	#
 	# Since PG::BasicTypeMapForQueries chooses the encoder to be used by the class of the submitted value,
@@ -40,7 +40,7 @@ class PG::BasicTypeMapForQueries < PG::TypeMapByClass
 	class UndefinedEncoder < RuntimeError
 	end
 
-	include PG::BasicTypeRegistry::Checker
+	include YugabyteYSQL::BasicTypeRegistry::Checker
 
 	# Create a new type map for query submission
 	#
@@ -132,9 +132,9 @@ class PG::BasicTypeMapForQueries < PG::TypeMapByClass
 					when :array
 						self[klass] = selector
 					when :json
-						self[klass] = PG::TextEncoder::JSON.new
+						self[klass] = YugabyteYSQL::TextEncoder::JSON.new
 					when :record
-						self[klass] = PG::TextEncoder::Record.new type_map: self
+						self[klass] = YugabyteYSQL::TextEncoder::Record.new type_map: self
 					when /\A_/
 						coder = coder_by_name(0, :encoder, @encode_array_as)
 						if coder
@@ -172,7 +172,7 @@ class PG::BasicTypeMapForQueries < PG::TypeMapByClass
 	rescue LoadError
 	end
 
-	DEFAULT_TYPE_MAP = PG.make_shareable({
+	DEFAULT_TYPE_MAP = YugabyteYSQL.make_shareable({
 		TrueClass => [1, 'bool', 'bool'],
 		FalseClass => [1, 'bool', 'bool'],
 		# We use text format and no type OID for numbers, because setting the OID can lead
@@ -189,7 +189,7 @@ class PG::BasicTypeMapForQueries < PG::TypeMapByClass
 	}.merge(has_bigdecimal ? {BigDecimal => [0, 'numeric']} : {}))
 	private_constant :DEFAULT_TYPE_MAP
 
-	DEFAULT_ARRAY_TYPE_MAP = PG.make_shareable({
+	DEFAULT_ARRAY_TYPE_MAP = YugabyteYSQL.make_shareable({
 		TrueClass => [0, '_bool'],
 		FalseClass => [0, '_bool'],
 		Integer => [0, '_int8'],

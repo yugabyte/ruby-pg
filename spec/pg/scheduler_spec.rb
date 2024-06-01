@@ -52,7 +52,7 @@ context "with a Fiber scheduler", :scheduler do
 			q = Queue.new
 			3.times do
 				Fiber.schedule do
-					conn = PG.connect(@conninfo_gate)
+					conn = YugabyteYSQL.connect(@conninfo_gate)
 					conn.finish
 					q << true
 				end
@@ -64,12 +64,12 @@ context "with a Fiber scheduler", :scheduler do
 
 	it "connects using without host but envirinment variables", :postgresql_12, :unix_socket do
 		run_with_scheduler do
-			vars = PG::Connection.conninfo_parse(@conninfo_gate).each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }
+			vars = YugabyteYSQL::Connection.conninfo_parse(@conninfo_gate).each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }
 
 			tmpconn = with_env_vars(PGHOST: "scheduler-localhost", PGPORT: vars[:port], PGDATABASE: vars[:dbname], PGSSLMODE: vars[:sslmode]) do
-				PG.connect
+				YugabyteYSQL.connect
 			end
-			expect( tmpconn.status ).to eq( PG::CONNECTION_OK )
+			expect( tmpconn.status ).to eq(YugabyteYSQL::CONNECTION_OK )
 			expect( tmpconn.host ).to eq( "scheduler-localhost" )
 			tmpconn.finish
 		end
@@ -78,7 +78,7 @@ context "with a Fiber scheduler", :scheduler do
 	it "can connect with DNS lookup", :scheduler_address_resolve do
 		run_with_scheduler do
 			conninfo = @conninfo_gate.gsub(/(^| )host=\w+/, " host=scheduler-localhost")
-			conn = PG.connect(conninfo)
+			conn = YugabyteYSQL.connect(conninfo)
 			opt = conn.conninfo.find { |info| info[:keyword] == 'host' }
 			expect( opt[:val] ).to start_with( 'scheduler-localhost' )
 			conn.finish
@@ -87,7 +87,7 @@ context "with a Fiber scheduler", :scheduler do
 
 	it "can reset the connection" do
 		run_with_scheduler do
-			conn = PG.connect(@conninfo_gate)
+			conn = YugabyteYSQL.connect(@conninfo_gate)
 			conn.exec("SET search_path TO test1")
 			expect( conn.exec("SHOW search_path").values ).to eq( [["test1"]] )
 			conn.reset
@@ -241,7 +241,7 @@ context "with a Fiber scheduler", :scheduler do
 				conn.cancel if notice =~ /foobar/
 			end
 			conn.send_query "do $$ BEGIN RAISE NOTICE 'foobar'; PERFORM pg_sleep(5); END; $$ LANGUAGE plpgsql;"
-			expect{ conn.get_last_result }.to raise_error(PG::QueryCanceled)
+			expect{ conn.get_last_result }.to raise_error(YugabyteYSQL::QueryCanceled)
 			expect( Time.now - start ).to be < 4.9
 		end
 	end
@@ -259,8 +259,8 @@ context "with a Fiber scheduler", :scheduler do
 		run_with_scheduler do |conn|
 			# ping doesn't trigger the scheduler, but runs in a second thread.
 			# This is why @conninfo is used instead of @conninfo_gate
-			ping = PG::Connection.ping(@conninfo)
-			expect( ping ).to eq( PG::PQPING_OK )
+			ping = YugabyteYSQL::Connection.ping(@conninfo)
+			expect( ping ).to eq(YugabyteYSQL::PQPING_OK )
 		end
 	end
 end

@@ -3,11 +3,11 @@
 
 require_relative '../helpers'
 
-require 'pg'
+require 'yugabyte_ysql'
 
 
-describe PG::TypeMap do
-	let!(:tm){ PG::TypeMap.new.freeze }
+describe YugabyteYSQL::TypeMap do
+	let!(:tm){ YugabyteYSQL::TypeMap.new.freeze }
 
 	it "should give account about memory usage" do
 		expect( ObjectSpace.memsize_of(tm) ).to be > DATA_OBJ_MEMSIZE

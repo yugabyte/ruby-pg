@@ -1,14 +1,14 @@
 # -*- ruby -*-
 
-require 'pg'
+require 'yugabyte_ysql'
 
-conn = PG.connect( :dbname => 'test' )
+conn = YugabyteYSQL.connect(:dbname => 'test' )
 $stderr.puts '---',
-	RUBY_DESCRIPTION,
-	PG.version_string( true ),
-	"Server version: #{conn.server_version}",
-	"Client version: #{PG.library_version}",
-	'---'
+             RUBY_DESCRIPTION,
+             YugabyteYSQL.version_string(true ),
+             "Server version: #{conn.server_version}",
+             "Client version: #{YugabyteYSQL.library_version}",
+             '---'
 
 result = conn.exec( "SELECT * from pg_stat_activity" )
 

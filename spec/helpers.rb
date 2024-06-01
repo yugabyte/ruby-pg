@@ -3,7 +3,7 @@
 require 'pathname'
 require 'rspec'
 require 'shellwords'
-require 'pg'
+require 'yugabyte_ysql'
 require 'openssl'
 require 'objspace'
 require_relative 'helpers/scheduler.rb'
@@ -15,7 +15,7 @@ TEST_DIR_STR = ENV['RUBY_PG_TEST_DIR'] || DEFAULT_TEST_DIR_STR
 TEST_DIRECTORY = Pathname.new(TEST_DIR_STR)
 DATA_OBJ_MEMSIZE = ObjectSpace.memsize_of(Object.new)
 
-module PG::TestingHelpers
+module YugabyteYSQL::TestingHelpers
 
 	### Automatically wrap a transaction around examples that don't disable it.
 	def self::included( mod )
@@ -56,7 +56,7 @@ module PG::TestingHelpers
 					example.run
 				ensure
 					if @conn.respond_to?(:exit_pipeline_mode) &&
-							@conn.pipeline_status != PG::PQ_PIPELINE_OFF
+							@conn.pipeline_status != YugabyteYSQL::PQ_PIPELINE_OFF
 						@conn.pipeline_sync
 						# Fetch results until two successive nil's
 						loop do
@@ -67,8 +67,8 @@ module PG::TestingHelpers
 						@conn.exit_pipeline_mode
 					end
 					@conn.setnonblocking false
-					@conn.type_map_for_results = PG::TypeMapAllStrings.new
-					@conn.type_map_for_queries = PG::TypeMapAllStrings.new
+					@conn.type_map_for_results = YugabyteYSQL::TypeMapAllStrings.new
+					@conn.type_map_for_queries = YugabyteYSQL::TypeMapAllStrings.new
 					@conn.encoder_for_put_copy_data = nil
 					@conn.decoder_for_get_copy_data = nil
 					@conn.exec( 'ROLLBACK' ) unless example.metadata[:without_transaction]
@@ -339,7 +339,7 @@ EOT
 		end
 
 		def connect
-			conn = PG.connect( @conninfo )
+			conn = YugabyteYSQL.connect(@conninfo )
 			conn.set_notice_processor do |message|
 				$stderr.puts( @name + ':' + message ) if $DEBUG
 			end
@@ -512,9 +512,9 @@ EOT
 
 		def check_for_problems
 			return "is finished" if @conn.finished?
-			return "has bad status" unless @conn.status == PG::CONNECTION_OK
+			return "has bad status" unless @conn.status == YugabyteYSQL::CONNECTION_OK
 			return "has bad transaction status (%d)" % [ @conn.transaction_status ] unless
-				@conn.transaction_status.between?( PG::PQTRANS_IDLE, PG::PQTRANS_INTRANS )
+				@conn.transaction_status.between?(YugabyteYSQL::PQTRANS_IDLE, YugabyteYSQL::PQTRANS_INTRANS )
 			return "is not usable." unless self.can_exec_query?
 			return nil
 		end
@@ -546,16 +546,16 @@ EOT
 	def wait_for_polling_ok(conn, meth = :connect_poll)
 		status = conn.send(meth)
 
-		while status != PG::PGRES_POLLING_OK
-			if status == PG::PGRES_POLLING_READING
+		while status != YugabyteYSQL::PGRES_POLLING_OK
+			if status == YugabyteYSQL::PGRES_POLLING_READING
 				select( [conn.socket_io], [], [], 5.0 ) or
 					raise "Asynchronous connection timed out!"
 
-			elsif status == PG::PGRES_POLLING_WRITING
+			elsif status == YugabyteYSQL::PGRES_POLLING_WRITING
 				select( [], [conn.socket_io], [], 5.0 ) or
 					raise "Asynchronous connection timed out!"
 
-			elsif status == PG::PGRES_POLLING_FAILED
+			elsif status == YugabyteYSQL::PGRES_POLLING_FAILED
 				break
 			end
 			status = conn.send(meth)
@@ -626,7 +626,7 @@ EOT
 			scheduler_setup
 
 			Fiber.schedule do
-				conn = PG.connect(@conninfo_gate)
+				conn = YugabyteYSQL.connect(@conninfo_gate)
 
 				yield conn
 			ensure
@@ -653,7 +653,7 @@ EOT
 	def run_with_gate(timeout=10)
 		thread_with_timeout(timeout) do
 			gate = gate_setup
-			conn = PG.connect(@conninfo_gate)
+			conn = YugabyteYSQL.connect(@conninfo_gate)
 
 			yield conn, gate
 
@@ -684,7 +684,7 @@ end
 
 
 RSpec.configure do |config|
-	config.include( PG::TestingHelpers )
+	config.include(YugabyteYSQL::TestingHelpers )
 
 	config.run_all_when_everything_filtered = true
 	config.filter_run :focus
@@ -699,12 +699,12 @@ RSpec.configure do |config|
 		config.filter_run_excluding :windows
 	end
 
-	config.filter_run_excluding( :postgresql_94 ) if PG.library_version <  90400
-	config.filter_run_excluding( :postgresql_95 ) if PG.library_version <  90500
-	config.filter_run_excluding( :postgresql_96 ) if PG.library_version <  90600
-	config.filter_run_excluding( :postgresql_10 ) if PG.library_version < 100000
-	config.filter_run_excluding( :postgresql_12 ) if PG.library_version < 120000
-	config.filter_run_excluding( :postgresql_14 ) if PG.library_version < 140000
+	config.filter_run_excluding( :postgresql_94 ) if YugabyteYSQL.library_version <  90400
+	config.filter_run_excluding( :postgresql_95 ) if YugabyteYSQL.library_version <  90500
+	config.filter_run_excluding( :postgresql_96 ) if YugabyteYSQL.library_version <  90600
+	config.filter_run_excluding( :postgresql_10 ) if YugabyteYSQL.library_version < 100000
+	config.filter_run_excluding( :postgresql_12 ) if YugabyteYSQL.library_version < 120000
+	config.filter_run_excluding( :postgresql_14 ) if YugabyteYSQL.library_version < 140000
 	config.filter_run_excluding( :unix_socket ) if RUBY_PLATFORM=~/mingw|mswin/i
 	config.filter_run_excluding( :scheduler ) if RUBY_VERSION < "3.0" || (RUBY_PLATFORM =~ /mingw|mswin/ && RUBY_VERSION < "3.1") || !Fiber.respond_to?(:scheduler)
 	config.filter_run_excluding( :scheduler_address_resolve ) if RUBY_VERSION < "3.1"
@@ -718,12 +718,12 @@ RSpec.configure do |config|
 
 	### Automatically set up and tear down the database
 	config.before(:suite) do |*args|
-		PG::TestingHelpers.stop_existing_postmasters
+		YugabyteYSQL::TestingHelpers.stop_existing_postmasters
 
 		ENV['PGHOST'] = 'localhost'
 		ENV['PGPORT'] ||= "54321"
 		port = ENV['PGPORT'].to_i
-		$pg_server = PG::TestingHelpers::PostgresServer.new("specs", port: port)
+		$pg_server = YugabyteYSQL::TestingHelpers::PostgresServer.new("specs", port: port)
 		$pg_server.create_test_db
 	end
 	config.after(:suite) do
