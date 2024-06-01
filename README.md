@@ -1,10 +1,10 @@
-# pg_yugabytedb
+# yugabyte_ysql
 
 This is a fork of [Ruby interface to the PostgreSQL RDBMS](https://github.com/ged/ruby-pg) to develop a Ruby interface to YugabyteDB.
 
 ## Features
 
-This driver has the following features:
+This driver has the following features in addition to those that come with the upstream driver:
 
 ### Cluster Awareness to eliminate need for a load balancer
 
@@ -24,21 +24,33 @@ This is similar to 'Cluster Awareness' but uses those servers which are part of 
 
 Please refer to the [Use the Driver](#Use the Driver) section for examples.
 
+## Install the Driver
+
+```shell
+gem install -- --with-pg-config=<yugabyte-install-dir>/postgres/bin/pg_config
+```
+
 ## Use the Driver
 
 - Passing new connection properties for load balancing in connection url
 
   For uniform load balancing across all the server you just need to specify the _load_balance=true_ property in the url.
     ```
+    require 'yugabyte_ysql'
+    ...
     yburl = "postgresql://yugabyte:yugabyte@127.0.0.1:5433/yugabyte?load_balance=true"
-    connection = PG.connect(url)
+    connection = YugabyteYSQL.connect(url)
+    ...
     ```
 
   For specifying topology keys you need to set the additional property with a valid comma separated value.
 
     ```
+    require 'yugabyte_ysql'
+    ...
     yburl = "postgresql://yugabyte:yugabyte@127.0.0.1:5433/yugabyte?load_balance=true&topology_keys=cloud.regionA.zoneA,cloud.regionA.zoneB"
-    connection = PG.connect(url)
+    connection = YugabyteYSQL.connect(url)
+    ...
     ```
 
 ### Specifying fallback zones
@@ -63,8 +75,15 @@ The driver attempts connection to servers in the first fallback placement(s) if 
 then it attempts to connect to servers in the second fallback placement(s), if specified. This continues until the driver finds a server to connect to, else an error is returned to the application.
 And this repeats for each connection request.
 
+### Limitations
+
+- The load balancing feature of the Ruby Smart driver for YugabyteDB does not work with ActiveRecords - the ORM tool for Ruby apps.
 
 Rest of the README is from upstream repository.
+
+---
+
+# pg
 
 * home :: https://github.com/ged/ruby-pg
 * docs :: http://deveiate.org/code/pg (English) ,
