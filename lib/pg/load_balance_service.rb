@@ -46,7 +46,11 @@ class PG::LoadBalanceService
       if metadata_needs_refresh lb_props.refresh_interval
         while !refresh_done
           if @@control_connection == nil
-            @@control_connection = create_control_connection(iopts)
+            begin
+              @@control_connection = create_control_connection(iopts)
+            rescue
+              return nil
+            end
           end
           begin
             refresh_yb_servers(lb_props.failed_host_reconnect_delay, @@control_connection)
