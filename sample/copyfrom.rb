@@ -1,10 +1,10 @@
 # -*- ruby -*-
 
-require 'pg'
+require 'yugabyte_ysql'
 require 'stringio'
 
 $stderr.puts "Opening database connection ..."
-conn = PG.connect( :dbname => 'test' )
+conn = YugabyteYSQL.connect(:dbname => 'test' )
 
 conn.exec( <<END_SQL )
 DROP TABLE IF EXISTS logs;

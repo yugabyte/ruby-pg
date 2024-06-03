@@ -15,7 +15,7 @@ BEGIN {
 # Try to require the 'pg' library
 begin
 	$stderr.puts "Loading pg..."
-	require 'pg'
+	require 'yugabyte_ysql'
 rescue => e
 	$stderr.puts "Ack! pg library failed to load: #{e.message}\n\t" +
 		e.backtrace.join( "\n\t" )

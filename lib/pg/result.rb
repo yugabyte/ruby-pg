@@ -1,10 +1,10 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-require 'pg' unless defined?( PG )
+require 'yugabyte_ysql' unless defined?( YugabyteYSQL )
 
 
-class PG::Result
+class YugabyteYSQL::Result
 
 	# Apply a type map for all value retrieving methods.
 	#

@@ -10,7 +10,7 @@ BEGIN {
         $LOAD_PATH.unshift( libdir.to_s ) unless $LOAD_PATH.include?( libdir.to_s )
 }
 
-require 'pg'
+require 'yugabyte_ysql'
 
 TRIGGER_TABLE = %{
 	CREATE TABLE IF NOT EXISTS test ( message text );
@@ -41,7 +41,7 @@ FOR EACH STATEMENT
 EXECUTE PROCEDURE notify_test();
 }
 
-conn = PG.connect( :dbname => 'test' )
+conn = YugabyteYSQL.connect(:dbname => 'test' )
 
 conn.exec( TRIGGER_TABLE )
 conn.exec( TRIGGER_FUNCTION )

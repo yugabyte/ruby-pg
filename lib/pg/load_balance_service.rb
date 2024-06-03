@@ -1,8 +1,8 @@
 # frozen_string_literal: true
-require 'pg' unless defined?( PG )
+require 'yugabyte_ysql' unless defined?( YugabyteYSQL )
 require 'concurrent'
 
-class PG::LoadBalanceService
+class YugabyteYSQL::LoadBalanceService
 
   LBProperties = Struct.new(:placements_info, :refresh_interval, :fallback_to_tk_only, :failed_host_reconnect_delay)
   Node = Struct.new(:host, :port, :cloud, :region, :zone, :public_ip, :count, :is_down, :down_since)
@@ -104,7 +104,7 @@ class PG::LoadBalanceService
         iopts[:host] = lb_host
         iopts[:port] = lb_port
         # iopts = resolve_hosts(iopts)
-        connection = PG.connect(iopts)
+        connection = YugabyteYSQL.connect(iopts)
         success = true
       rescue => e
         @@mutex.acquire_write_lock
@@ -129,7 +129,7 @@ class PG::LoadBalanceService
     # Iterate until control connection is successful or all nodes are tried
     until success
       begin
-        conn = PG.connect(iopts)
+        conn = YugabyteYSQL.connect(iopts)
         success = true
       rescue => e
         if @@cluster_info[iopts[:host]]
@@ -143,7 +143,7 @@ class PG::LoadBalanceService
           iopts[:port] = new_list[h].port
           iopts[:host] = h
         else
-          raise(PG::Error, "Unable to create a control connection")
+          raise(YugabyteYSQL::Error, "Unable to create a control connection")
         end
       end
     end
@@ -385,7 +385,7 @@ class PG::LoadBalanceService
   end
 
   def self.resolve_host(mhost)
-    if PG::Connection.host_is_named_pipe?(mhost)
+    if YugabyteYSQL::Connection.host_is_named_pipe?(mhost)
       # No hostname to resolve (UnixSocket)
       hostaddrs = [nil]
     else

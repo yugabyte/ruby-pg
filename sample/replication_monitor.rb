@@ -19,7 +19,7 @@ require 'ostruct'
 require 'optparse'
 require 'pathname'
 require 'etc'
-require 'pg'
+require 'yugabyte_ysql'
 require 'pp'
 
 
@@ -58,7 +58,7 @@ class PGMonitor
 		# check all slaves
 		self.slaves.each do |slave|
 			begin
-				slave_db = PG.connect(
+				slave_db = YugabyteYSQL.connect(
 					:dbname   => self.opts.database,
 					:host     => slave,
 					:port     => self.opts.port,
@@ -91,7 +91,7 @@ class PGMonitor
 	### the failures array and returns false.
 	###
 	def get_current_wal
-		master_db = PG.connect(
+		master_db = YugabyteYSQL.connect(
 			:dbname   => self.opts.database,
 			:host     => self.master,
 			:port     => self.opts.port,

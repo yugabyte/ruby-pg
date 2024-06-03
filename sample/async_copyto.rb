@@ -1,12 +1,12 @@
 # -*- ruby -*-
 
-require 'pg'
+require 'yugabyte_ysql'
 require 'stringio'
 
 # Using COPY asynchronously
 
 $stderr.puts "Opening database connection ..."
-conn = PG.connect( :dbname => 'test' )
+conn = YugabyteYSQL.connect(:dbname => 'test' )
 conn.setnonblocking( true )
 
 socket = conn.socket_io

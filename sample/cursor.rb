@@ -1,12 +1,12 @@
 # -*- ruby -*-
 
-require 'pg'
+require 'yugabyte_ysql'
 
 # An example of how to use SQL cursors. This is mostly a straight port of
 # the cursor portion of testlibpq.c from src/test/examples.
 
 $stderr.puts "Opening database connection ..."
-conn = PG.connect( :dbname => 'test' )
+conn = YugabyteYSQL.connect(:dbname => 'test' )
 
 #
 conn.transaction do

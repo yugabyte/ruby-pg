@@ -3,7 +3,7 @@
 
 require 'json'
 
-module PG
+module YugabyteYSQL
 	module TextDecoder
 		class JSON < SimpleDecoder
 			def decode(string, tuple=nil, field=nil)

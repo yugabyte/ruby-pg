@@ -1,12 +1,12 @@
 # -*- ruby -*-
 
-require 'pg'
+require 'yugabyte_ysql'
 require 'stringio'
 
 # An example of how to stream data to your local host from the database as CSV.
 
 $stderr.puts "Opening database connection ..."
-conn = PG.connect( :dbname => 'test' )
+conn = YugabyteYSQL.connect(:dbname => 'test' )
 
 $stderr.puts "Running COPY command ..."
 buf = ''
