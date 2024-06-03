@@ -27,7 +27,7 @@ Please refer to the [Use the Driver](#Use the Driver) section for examples.
 ## Install the Driver
 
 ```shell
-gem install -- --with-pg-config=<yugabyte-install-dir>/postgres/bin/pg_config
+gem install yugabyte_ysql -- --with-pg-config=<yugabyte-install-dir>/postgres/bin/pg_config
 ```
 
 ## Use the Driver
@@ -51,6 +51,14 @@ gem install -- --with-pg-config=<yugabyte-install-dir>/postgres/bin/pg_config
     yburl = "postgresql://yugabyte:yugabyte@127.0.0.1:5433/yugabyte?load_balance=true&topology_keys=cloud.regionA.zoneA,cloud.regionA.zoneB"
     connection = YugabyteYSQL.connect(url)
     ...
+    ```
+
+  Alternatively, you could also specify the properties as key, value pairs as shown below.
+
+    ```
+    connection = YugabyteYSQL.connect(host: 'localhost', port: '5433', dbname: 'yugabyte',
+                                      user: 'yugabyte', password: 'yugabyte',
+                                      load_balance: 'true', yb_servers_refresh_interval: '10')
     ```
 
 ### Specifying fallback zones
