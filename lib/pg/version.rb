@@ -1,4 +1,5 @@
-module PG
+module YugabyteYSQL
 	# Library version
-	VERSION = '1.5.6'
+	PG_VERSION = '1.5.6'
+	VERSION = '0.2'
 end

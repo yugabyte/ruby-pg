@@ -1,7 +1,7 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-module PG
+module YugabyteYSQL
 	module TextEncoder
 		# Init C part of the decoder
 		init_numeric

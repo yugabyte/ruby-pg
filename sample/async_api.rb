@@ -1,6 +1,6 @@
 # -*- ruby -*-
 
-require 'pg'
+require 'yugabyte_ysql'
 
 # This is a example of how to use the asynchronous API to query the
 # server without blocking other threads. It's intentionally low-level;
@@ -22,26 +22,26 @@ end
 
 # Start the connection
 output_progress "Starting connection..."
-conn = PG::Connection.connect_start( :dbname => 'test' ) or
+conn = YugabyteYSQL::Connection.connect_start(:dbname => 'test' ) or
 	abort "Unable to create a new connection!"
 abort "Connection failed: %s" % [ conn.error_message ] if
-	conn.status == PG::CONNECTION_BAD
+	conn.status == YugabyteYSQL::CONNECTION_BAD
 
 # Track the progress of the connection, waiting for the socket to become readable/writable
 # before polling it
-poll_status = PG::PGRES_POLLING_WRITING
-until poll_status == PG::PGRES_POLLING_OK ||
-	  poll_status == PG::PGRES_POLLING_FAILED
+poll_status = YugabyteYSQL::PGRES_POLLING_WRITING
+until poll_status == YugabyteYSQL::PGRES_POLLING_OK ||
+	  poll_status == YugabyteYSQL::PGRES_POLLING_FAILED
 
 	# If the socket needs to read, wait 'til it becomes readable to poll again
 	case poll_status
-	when PG::PGRES_POLLING_READING
+	when YugabyteYSQL::PGRES_POLLING_READING
 		output_progress "  waiting for socket to become readable"
 		select( [conn.socket_io], nil, nil, TIMEOUT ) or
 			raise "Asynchronous connection timed out!"
 
 	# ...and the same for when the socket needs to write
-	when PG::PGRES_POLLING_WRITING
+	when YugabyteYSQL::PGRES_POLLING_WRITING
 		output_progress "  waiting for socket to become writable"
 		select( nil, [conn.socket_io], nil, TIMEOUT ) or
 			raise "Asynchronous connection timed out!"
@@ -49,19 +49,19 @@ until poll_status == PG::PGRES_POLLING_OK ||
 
 	# Output a status message about the progress
 	case conn.status
-	when PG::CONNECTION_STARTED
+	when YugabyteYSQL::CONNECTION_STARTED
 		output_progress "  waiting for connection to be made."
-	when PG::CONNECTION_MADE
+	when YugabyteYSQL::CONNECTION_MADE
 		output_progress "  connection OK; waiting to send."
-	when PG::CONNECTION_AWAITING_RESPONSE
+	when YugabyteYSQL::CONNECTION_AWAITING_RESPONSE
 		output_progress "  waiting for a response from the server."
-	when PG::CONNECTION_AUTH_OK
+	when YugabyteYSQL::CONNECTION_AUTH_OK
 		output_progress "  received authentication; waiting for backend start-up to finish."
-	when PG::CONNECTION_SSL_STARTUP
+	when YugabyteYSQL::CONNECTION_SSL_STARTUP
 		output_progress "  negotiating SSL encryption."
-	when PG::CONNECTION_SETENV
+	when YugabyteYSQL::CONNECTION_SETENV
 		output_progress "  negotiating environment-driven parameter settings."
-	when PG::CONNECTION_NEEDED
+	when YugabyteYSQL::CONNECTION_NEEDED
 		output_progress "  internal state: connect() needed."
 	end
 
@@ -69,7 +69,7 @@ until poll_status == PG::PGRES_POLLING_OK ||
 	poll_status = conn.connect_poll
 end
 
-abort "Connect failed: %s" % [ conn.error_message ] unless conn.status == PG::CONNECTION_OK
+abort "Connect failed: %s" % [ conn.error_message ] unless conn.status == YugabyteYSQL::CONNECTION_OK
 
 output_progress "Sending query"
 conn.send_query( "SELECT * FROM pg_stat_activity" )

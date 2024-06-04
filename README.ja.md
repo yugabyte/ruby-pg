@@ -15,13 +15,14 @@ RDBMS](http://www.postgresql.org/)へのRubyのインターフェースです。
 9.3以降](http://www.postgresql.org/support/versioning/)で動作します。
 
 簡単な使用例は次の通りです。
+
 ```ruby
   #!/usr/bin/env ruby
 
   require 'pg'
 
   # データベースへの現在の接続を表に出力します
-  conn = PG.connect( dbname: 'sales' )
+  conn = YugabyteYSQL.connect( dbname: 'sales' )
   conn.exec( "SELECT * FROM pg_stat_activity" ) do |result|
     puts "     PID | User             | Query"
     result.each do |row|
@@ -88,16 +89,17 @@ Pgでは任意でRubyと素のCコードにある結果の値やクエリ引数�
 なぜなら文字列のアロケーションが減り、（比較的遅い）Rubyのコードでの変換部分が省かれるからです。
 
 とても基本的な型変換は次のようにできます。
-```ruby
-    conn.type_map_for_results = PG::BasicTypeMapForResults.new conn
-    # ……これは結果の値の対応付けに作用します。
-    conn.exec("select 1, now(), '{2,3}'::int[]").values
-        # => [[1, 2014-09-21 20:51:56 +0200, [2, 3]]]
 
-    conn.type_map_for_queries = PG::BasicTypeMapForQueries.new conn
-    # ……そしてこれは引数値の対応付けのためのものです。
-    conn.exec_params("SELECT $1::text, $2::text, $3::text", [1, 1.23, [2,3]]).values
-        # => [["1", "1.2300000000000000E+00", "{2,3}"]]
+```ruby
+    conn.type_map_for_results = YugabyteYSQL::BasicTypeMapForResults.new conn
+# ……これは結果の値の対応付けに作用します。
+conn.exec("select 1, now(), '{2,3}'::int[]").values
+# => [[1, 2014-09-21 20:51:56 +0200, [2, 3]]]
+
+conn.type_map_for_queries = YugabyteYSQL::BasicTypeMapForQueries.new conn
+# ……そしてこれは引数値の対応付けのためのものです。
+conn.exec_params("SELECT $1::text, $2::text, $3::text", [1, 1.23, [2, 3]]).values
+# => [["1", "1.2300000000000000E+00", "{2,3}"]]
 ```
 
 しかしPgの型変換はかなり調整が効きます。2層に分かれているのがその理由です。

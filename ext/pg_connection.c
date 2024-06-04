@@ -11,6 +11,7 @@
 
 
 VALUE rb_cPGconn;
+VALUE rb_cPGlbs;
 static ID s_id_encode;
 static ID s_id_autoclose_set;
 static VALUE sym_type, sym_format, sym_value;
@@ -532,6 +533,9 @@ static VALUE
 pgconn_finish( VALUE self )
 {
 	t_pg_connection *this = pg_get_connection_safe( self );
+	char *host = PQhost(this->pgconn);
+	rb_cPGlbs = rb_define_class_under( rb_mPG, "LoadBalanceService", rb_cObject );
+	if (host) rb_funcall(rb_cPGlbs, rb_intern("decrement_connection_count"), 1, rb_str_new2(host));
 
 	pgconn_close_socket_io( self );
 	PQfinish( this->pgconn );

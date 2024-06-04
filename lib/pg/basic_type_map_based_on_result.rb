@@ -1,7 +1,7 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-require 'pg' unless defined?( PG )
+require 'yugabyte_ysql' unless defined?( YugabyteYSQL )
 
 # Simple set of rules for type casting common PostgreSQL types from Ruby
 # to PostgreSQL.
@@ -53,8 +53,8 @@ require 'pg' unless defined?( PG )
 # database types using binary copy and value format.
 # Binary COPY is faster than text format but less portable and less readable and pg offers fewer en-/decoders of database types.
 #
-class PG::BasicTypeMapBasedOnResult < PG::TypeMapByOid
-	include PG::BasicTypeRegistry::Checker
+class YugabyteYSQL::BasicTypeMapBasedOnResult < YugabyteYSQL::TypeMapByOid
+	include YugabyteYSQL::BasicTypeRegistry::Checker
 
 	def initialize(connection_or_coder_maps, registry: nil)
 		@coder_maps = build_coder_maps(connection_or_coder_maps, registry: registry)

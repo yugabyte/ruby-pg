@@ -1,7 +1,7 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-module PG
+module YugabyteYSQL
 	module TextEncoder
 		class Date < SimpleEncoder
 			def encode(value)

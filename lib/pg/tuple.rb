@@ -1,10 +1,10 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-require 'pg' unless defined?( PG )
+require 'yugabyte_ysql' unless defined?( YugabyteYSQL )
 
 
-class PG::Tuple
+class YugabyteYSQL::Tuple
 
 	### Return a String representation of the object suitable for debugging.
 	def inspect

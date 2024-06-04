@@ -1,9 +1,9 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-require 'pg' unless defined?( PG )
+require 'yugabyte_ysql' unless defined?( YugabyteYSQL )
 
-class PG::TypeMapByColumn
+class YugabyteYSQL::TypeMapByColumn
 	# Returns the type oids of the assigned coders.
 	def oids
 		coders.map{|c| c.oid if c }

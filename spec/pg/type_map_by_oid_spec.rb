@@ -3,18 +3,18 @@
 
 require_relative '../helpers'
 
-require 'pg'
+require 'yugabyte_ysql'
 
 
-describe PG::TypeMapByOid do
+describe YugabyteYSQL::TypeMapByOid do
 
-	let!(:textdec_int){ PG::TextDecoder::Integer.new(name: 'INT4', oid: 23).freeze }
-	let!(:textdec_float){ PG::TextDecoder::Float.new(name: 'FLOAT8', oid: 701).freeze }
-	let!(:textdec_string){ PG::TextDecoder::String.new(name: 'TEXT', oid: 25).freeze }
-	let!(:textdec_bytea){ PG::TextDecoder::Bytea.new(name: 'BYTEA', oid: 17).freeze }
-	let!(:binarydec_float){ PG::BinaryDecoder::Float.new(name: 'FLOAT8', oid: 701, format: 1).freeze }
+	let!(:textdec_int){ YugabyteYSQL::TextDecoder::Integer.new(name: 'INT4', oid: 23).freeze }
+	let!(:textdec_float){ YugabyteYSQL::TextDecoder::Float.new(name: 'FLOAT8', oid: 701).freeze }
+	let!(:textdec_string){ YugabyteYSQL::TextDecoder::String.new(name: 'TEXT', oid: 25).freeze }
+	let!(:textdec_bytea){ YugabyteYSQL::TextDecoder::Bytea.new(name: 'BYTEA', oid: 17).freeze }
+	let!(:binarydec_float){ YugabyteYSQL::BinaryDecoder::Float.new(name: 'FLOAT8', oid: 701, format: 1).freeze }
 	let!(:pass_through_type) do
-		type = Class.new(PG::SimpleDecoder) do
+		type = Class.new(YugabyteYSQL::SimpleDecoder) do
 			def decode(*v)
 				v
 			end
@@ -26,7 +26,7 @@ describe PG::TypeMapByOid do
 	end
 
 	let!(:tm) do
-		tm = PG::TypeMapByOid.new
+		tm = YugabyteYSQL::TypeMapByOid.new
 		tm.add_coder textdec_int
 		tm.add_coder textdec_float
 		tm.add_coder binarydec_float
@@ -35,7 +35,7 @@ describe PG::TypeMapByOid do
 	end
 
 	let!(:tm_writable) do
-		tm_writable = PG::TypeMapByOid.new
+		tm_writable = YugabyteYSQL::TypeMapByOid.new
 		tm.coders.each do |c|
 			tm_writable.add_coder c
 		end
@@ -43,19 +43,19 @@ describe PG::TypeMapByOid do
 	end
 
 	it "should deny changes when frozen" do
-		tm = PG::TypeMapByOid.new.freeze
-		expect{ tm.default_type_map = PG::TypeMapByClass.new }.to raise_error(FrozenError)
-		expect{ tm.with_default_type_map(PG::TypeMapByClass.new) }.to raise_error(FrozenError)
+		tm = YugabyteYSQL::TypeMapByOid.new.freeze
+		expect{ tm.default_type_map = YugabyteYSQL::TypeMapByClass.new }.to raise_error(FrozenError)
+		expect{ tm.with_default_type_map(YugabyteYSQL::TypeMapByClass.new) }.to raise_error(FrozenError)
 		expect{ tm.add_coder textdec_int }.to raise_error(FrozenError)
 	end
 
 	it "should be shareable for Ractor", :ractor do
-		tm = PG::TypeMapByOid.new.freeze
+		tm = YugabyteYSQL::TypeMapByOid.new.freeze
 		Ractor.make_shareable(tm)
 	end
 
 	it "should give account about memory usage" do
-		tm = PG::TypeMapByOid.new
+		tm = YugabyteYSQL::TypeMapByOid.new
 		expect( ObjectSpace.memsize_of(tm) ).to be > DATA_OBJ_MEMSIZE
 	end
 
@@ -84,7 +84,7 @@ describe PG::TypeMapByOid do
 	end
 
 	it "should check format when adding coders" do
-		textdec_int = PG::TextDecoder::Integer.new(name: 'INT4', oid: 23)
+		textdec_int = YugabyteYSQL::TextDecoder::Integer.new(name: 'INT4', oid: 23)
 		textdec_int.format = 2
 		expect{ tm_writable.add_coder textdec_int }.to raise_error(ArgumentError)
 		textdec_int.format = -1
@@ -96,7 +96,7 @@ describe PG::TypeMapByOid do
 	end
 
 	it "should allow reading and writing max_rows_for_online_lookup" do
-		tm = PG::TypeMapByOid.new
+		tm = YugabyteYSQL::TypeMapByOid.new
 		expect( tm.max_rows_for_online_lookup ).to eq(10)
 		tm.max_rows_for_online_lookup = 5
 		expect( tm.max_rows_for_online_lookup ).to eq(5)
@@ -105,7 +105,7 @@ describe PG::TypeMapByOid do
 	it "should allow building new TypeMapByColumn for a given result" do
 		res = @conn.exec( "SELECT 1, 'a', 2.0::FLOAT, '2013-06-30'::DATE" )
 		tm2 = tm.build_column_map(res)
-		expect( tm2 ).to be_a_kind_of(PG::TypeMapByColumn)
+		expect( tm2 ).to be_a_kind_of(YugabyteYSQL::TypeMapByColumn)
 		expect( tm2.coders ).to eq( [textdec_int, nil, textdec_float, pass_through_type] )
 	end
 
@@ -113,12 +113,12 @@ describe PG::TypeMapByOid do
 		# One run with implicit built TypeMapByColumn and another with online lookup
 		# for each type map.
 		[[0, 0], [0, 10], [10, 0], [10, 10]].each do |max_rows1, max_rows2|
-			tm1 = PG::TypeMapByOid.new
-			tm1.add_coder PG::TextDecoder::Integer.new name: 'INT2', oid: 21
+			tm1 = YugabyteYSQL::TypeMapByOid.new
+			tm1.add_coder YugabyteYSQL::TextDecoder::Integer.new name: 'INT2', oid: 21
 			tm1.max_rows_for_online_lookup = max_rows1
 
-			tm2 = PG::TypeMapByOid.new
-			tm2.add_coder PG::TextDecoder::Integer.new name: 'INT4', oid: 23
+			tm2 = YugabyteYSQL::TypeMapByOid.new
+			tm2.add_coder YugabyteYSQL::TextDecoder::Integer.new name: 'INT4', oid: 23
 			tm2.max_rows_for_online_lookup = max_rows2
 			tm2.default_type_map = tm1
 
@@ -143,14 +143,14 @@ describe PG::TypeMapByOid do
 	it "should build a TypeMapByColumn when assigned and the number of rows is high enough" do
 		res = @conn.exec( "SELECT generate_series(1,20), 'a', 2.0::FLOAT, '2013-06-30'::DATE" )
 		res.type_map = tm
-		expect( res.type_map ).to be_kind_of( PG::TypeMapByColumn )
+		expect( res.type_map ).to be_kind_of(YugabyteYSQL::TypeMapByColumn )
 		expect( res.type_map.coders ).to eq( [textdec_int, nil, textdec_float, pass_through_type] )
 	end
 
 	it "should use TypeMapByOid for online lookup and the number of rows is low enough" do
 		res = @conn.exec( "SELECT 1, 'a', 2.0::FLOAT, '2013-06-30'::DATE" )
 		res.type_map = tm
-		expect( res.type_map ).to be_kind_of( PG::TypeMapByOid )
+		expect( res.type_map ).to be_kind_of(YugabyteYSQL::TypeMapByOid )
 	end
 
 	#

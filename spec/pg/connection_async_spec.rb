@@ -4,15 +4,15 @@
 require_relative '../helpers'
 
 require 'socket'
-require 'pg'
+require 'yugabyte_ysql'
 
-describe PG::Connection do
+describe YugabyteYSQL::Connection do
 
 	it "tries to connect to localhost with IPv6 and IPv4", :ipv6, :postgresql_10 do
 		uri = "postgres://localhost:#{@port+1}/test"
 		expect(described_class).to receive(:parse_connect_args).once.ordered.with(uri, any_args).and_call_original
 		expect(described_class).to receive(:parse_connect_args).once.ordered.with(hash_including(hostaddr: "::1,127.0.0.1")).and_call_original
-		expect{ described_class.connect( uri ) }.to raise_error(PG::ConnectionBad)
+		expect{ described_class.connect( uri ) }.to raise_error(YugabyteYSQL::ConnectionBad)
 	end
 
 	def interrupt_thread(exc=nil)
@@ -66,7 +66,7 @@ describe PG::Connection do
 				end
 			end
 
-			expect( t.value ).to be_kind_of( PG::UndefinedColumn )
+			expect( t.value ).to be_kind_of(YugabyteYSQL::UndefinedColumn )
 			expect( duration ).to be < 10
 		end
 
@@ -88,8 +88,8 @@ describe PG::Connection do
 				end
 			end
 
-			expect( t.value ).to be_kind_of( PG::Result )
-			expect( t.value.result_status ).to eq( PG::PGRES_COMMAND_OK )
+			expect( t.value ).to be_kind_of(YugabyteYSQL::Result )
+			expect( t.value.result_status ).to eq(YugabyteYSQL::PGRES_COMMAND_OK )
 		end
 	end
 
@@ -125,7 +125,7 @@ describe PG::Connection do
 				serv = TCPServer.new( '127.0.0.1', 54320 )
 				expect {
 					described_class.connect( '127.0.0.1', 54320, "", "", "me", "xxxx", "somedb" )
-				}.to raise_error(PG::ConnectionBad, /server closed the connection unexpectedly/)
+				}.to raise_error(YugabyteYSQL::ConnectionBad, /server closed the connection unexpectedly/)
 			end
 
 			sleep 0.5
