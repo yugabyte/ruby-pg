@@ -333,7 +333,15 @@ class YugabyteYSQL::Connection
 	### Returns an array of Hashes with connection defaults. See ::conndefaults
 	### for details.
 	def conndefaults
-		return self.class.conndefaults
+		original = self.class.conndefaults
+		original << {:keyword=>"load_balance", :label=>"YB-Load-Balance", :dispchar=>"", :dispsize=>5}
+		original << {:keyword=>"topology_keys", :label=>"YB-Topology-Keys", :dispchar=>"", :dispsize=>64}
+		original << {:keyword=>"yb_servers_refresh_interval", :label=>"YB-Refresh-Interval", :dispchar=>"", :dispsize=>3}
+		original << {:keyword=>"fallback_to_topology_keys_only", :label=>"YB-Fallback-To-Topology-Keys-Only", :dispchar=>"", :dispsize=>5}
+		original << {:keyword=>"failed_host_reconnect_delay_secs", :label=>"YB-Failed-Host-Reconnect-Delay", :dispchar=>"", :dispsize=>3}
+
+		puts "updated conndefaults: #{original}"
+		return original
 	end
 
 	### Return the Postgres connection defaults structure as a Hash keyed by option
