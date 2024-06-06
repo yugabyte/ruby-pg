@@ -841,6 +841,7 @@ class YugabyteYSQL::Connection
 			original_host = iopts[:host]
 			original_port = iopts[:port]
 
+			puts "load_balance: #{lb_properties}"
 			if lb_properties
 				connection = YugabyteYSQL::LoadBalanceService.connect_to_lb_hosts(lb_properties, iopts)
 			end
