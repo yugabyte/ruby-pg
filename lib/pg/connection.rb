@@ -68,20 +68,23 @@ class YugabyteYSQL::Connection
 	end
 
 	def self.parse_connect_args_and_return_lb_props( *args )
+		lb_props = check_lb_env
 		hash_arg = args.last.is_a?( Hash ) ? args.pop.transform_keys(&:to_sym) : {}
 		iopts = {}
 		if not hash_arg.empty? and not hash_arg.key?(:port)
 			hash_arg[:port] = 5433
 		end
 
-		lb_props = {}
+		# lb_props = {}
 		if args.length == 1
 			case args.first.to_s
 			when /=/, /:\/\//
 				# Option or URL string style
 				conn_string = args.first.to_s
 				# extract and parse lb properties from conn_string
-				conn_string, lb_props = YugabyteYSQL::LoadBalanceService.parse_lb_args_from_url conn_string
+				unless lb_props
+					conn_string, lb_props = YugabyteYSQL::LoadBalanceService.parse_lb_args_from_url conn_string
+				end
 				iopts = YugabyteYSQL::Connection.conninfo_parse(conn_string).each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }
 			else
 				# Positional parameters (only host given)
@@ -99,7 +102,9 @@ class YugabyteYSQL::Connection
 			iopts.delete(:tty) # ignore obsolete tty parameter
 		end
 
-		lb_props = YugabyteYSQL::LoadBalanceService.parse_connect_lb_args hash_arg unless hash_arg.empty?
+		unless lb_props
+			lb_props = YugabyteYSQL::LoadBalanceService.parse_connect_lb_args hash_arg unless hash_arg.empty?
+		end
 
 		iopts.merge!( hash_arg )
 
@@ -108,6 +113,21 @@ class YugabyteYSQL::Connection
 		end
 
 		return connect_hash_to_string(iopts), lb_props
+	end
+
+	def self.check_lb_env
+		if ENV["YB_LOAD_BALANCE"] && ENV["YB_LOAD_BALANCE"].downcase == "true"
+			lb_props = Hash.new
+			lb_props[:load_balance] = ENV["YB_LOAD_BALANCE"]
+			lb_props[:topology_keys] = ENV["YB_TOPOLOGY_KEYS"]
+			lb_props[:yb_servers_refresh_interval] = ENV["YB_REFRESH_INTERVAL"]
+			lb_props[:fallback_to_topology_keys_only] = ENV["YB_FALLBACK_TK_ONLY"]
+			lb_props[:failed_host_reconnect_delay_secs] = ENV["YB_RECONNECT_DELAY"]
+			puts "LB ENV #{lb_props}"
+			YugabyteYSQL::LoadBalanceService.parse_connect_lb_args lb_props
+		else
+			nil
+		end
 	end
 
 	# Return a String representation of the object suitable for debugging.

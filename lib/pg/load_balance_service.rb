@@ -129,9 +129,11 @@ class YugabyteYSQL::LoadBalanceService
     # Iterate until control connection is successful or all nodes are tried
     until success
       begin
+        old = ENV.delete("YB_LOAD_BALANCE")
         conn = YugabyteYSQL.connect(iopts)
         success = true
       rescue => e
+        ENV["YB_LOAD_BALANCE"] = old if old
         if @@cluster_info[iopts[:host]]
           @@cluster_info[iopts[:host]].is_down = true
           @@cluster_info[iopts[:host]].down_since = Time.now.to_i
@@ -166,7 +168,7 @@ class YugabyteYSQL::LoadBalanceService
         found_public_ip = true
       end
 
-      # todo set useHostColumn field
+      # set useHostColumn field
       if @@useHostColumn.nil?
         if host.eql? conn.host
           @@useHostColumn = true
