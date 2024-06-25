@@ -166,7 +166,7 @@ class YugabyteYSQL::LoadBalanceService
         found_public_ip = true
       end
 
-      # todo set useHostColumn field
+      # set useHostColumn field
       if @@useHostColumn.nil?
         if host.eql? conn.host
           @@useHostColumn = true

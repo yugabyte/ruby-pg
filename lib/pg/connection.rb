@@ -340,8 +340,7 @@ class YugabyteYSQL::Connection
 		original << {:keyword=>"fallback_to_topology_keys_only", :label=>"YB-Fallback-To-Topology-Keys-Only", :dispchar=>"", :dispsize=>5}
 		original << {:keyword=>"failed_host_reconnect_delay_secs", :label=>"YB-Failed-Host-Reconnect-Delay", :dispchar=>"", :dispsize=>3}
 
-		puts "updated conndefaults: #{original}"
-		return original
+		original
 	end
 
 	### Return the Postgres connection defaults structure as a Hash keyed by option
