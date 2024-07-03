@@ -69,7 +69,7 @@ end
 $stderr.puts "Using libpq from #{dlldir}"
 
 File.write("postgresql_lib_path.rb", <<-EOT)
-module YugabyteYSQL
+module YSQL
 	POSTGRESQL_LIB_PATH = #{dlldir.inspect}
 end
 EOT

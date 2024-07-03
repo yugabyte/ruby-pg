@@ -2,10 +2,10 @@
 # encoding: utf-8
 
 require_relative '../helpers'
-require 'yugabyte_ysql'
+require 'ysql'
 
-describe YugabyteYSQL::Tuple do
-	let!(:typemap) { YugabyteYSQL::BasicTypeMapForResults.new(@conn).freeze }
+describe YSQL::Tuple do
+	let!(:typemap) { YSQL::BasicTypeMapForResults.new(@conn).freeze }
 	let!(:result2x2) { @conn.exec( "VALUES(1, 'a'), (2, 'b')" ).freeze }
 	let!(:result2x2_writable) { @conn.exec( "VALUES(1, 'a'), (2, 'b')" ) }
 	let!(:result2x2sym) { @conn.exec( "VALUES(1, 'a'), (2, 'b')" ).field_names_as(:symbol).freeze }
@@ -26,7 +26,7 @@ describe YugabyteYSQL::Tuple do
 	let!(:tuple2) { result2x3cast.tuple(0).freeze }
 	let!(:tuple2sym) { result2x3symcast.tuple(0).freeze }
 	let!(:tuple3) { str = Marshal.dump(result2x3cast.tuple(1).freeze); Marshal.load(str) }
-	let!(:tuple_empty) { YugabyteYSQL::Tuple.new.freeze }
+	let!(:tuple_empty) { YSQL::Tuple.new.freeze }
 
 	describe "[]" do
 		it "returns nil for invalid keys" do
@@ -79,14 +79,14 @@ describe YugabyteYSQL::Tuple do
 
 		it "casts lazy and caches result" do
 			a = []
-			deco = Class.new(YugabyteYSQL::SimpleDecoder) do
+			deco = Class.new(YSQL::SimpleDecoder) do
 				define_method(:decode) do |*args|
 					a << args
 					args.last
 				end
 			end.new
 
-			result2x2_writable.map_types!(YugabyteYSQL::TypeMapByColumn.new([deco, deco]))
+			result2x2_writable.map_types!(YSQL::TypeMapByColumn.new([deco, deco]))
 			t = result2x2_writable.tuple(1)
 
 			# cast and cache at first call to [0]
@@ -323,9 +323,9 @@ describe YugabyteYSQL::Tuple do
 			r.clear
 
 			# second column should fail
-			expect{ t[1] }.to raise_error(YugabyteYSQL::Error)
-			expect{ t.fetch(1) }.to raise_error(YugabyteYSQL::Error)
-			expect{ t.fetch("column2") }.to raise_error(YugabyteYSQL::Error)
+			expect{ t[1] }.to raise_error(YSQL::Error)
+			expect{ t.fetch(1) }.to raise_error(YSQL::Error)
+			expect{ t.fetch("column2") }.to raise_error(YSQL::Error)
 
 			# first column should succeed
 			expect( t[0] ).to eq( "1" )
@@ -333,7 +333,7 @@ describe YugabyteYSQL::Tuple do
 			expect( t.fetch("column1") ).to eq( "1" )
 
 			# should fail due to the second column
-			expect{ t.values }.to raise_error(YugabyteYSQL::Error)
+			expect{ t.values }.to raise_error(YSQL::Error)
 		end
 	end
 end

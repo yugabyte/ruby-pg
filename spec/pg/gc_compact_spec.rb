@@ -25,31 +25,31 @@ require_relative '../helpers'
 
 describe "GC.compact", if: GC.respond_to?(:compact) do
 	before :all do
-		TM1 = Class.new(YugabyteYSQL::TypeMapByClass) do
+		TM1 = Class.new(YSQL::TypeMapByClass) do
 			def conv_array(value)
-				YugabyteYSQL::TextEncoder::JSON.new
+				YSQL::TextEncoder::JSON.new
 			end
 		end.new
 		TM1[Array] = :conv_array
 
-		E1 = YugabyteYSQL::TextEncoder::JSON.new
+		E1 = YSQL::TextEncoder::JSON.new
 
-		TM2 = YugabyteYSQL::TypeMapByClass.new
-		TM2.default_type_map = YugabyteYSQL::TypeMapInRuby.new
+		TM2 = YSQL::TypeMapByClass.new
+		TM2.default_type_map = YSQL::TypeMapInRuby.new
 
-		TMBC = YugabyteYSQL::TypeMapByColumn.new([YugabyteYSQL::TextDecoder::Float.new])
+		TMBC = YSQL::TypeMapByColumn.new([YSQL::TextDecoder::Float.new])
 
 
-		CONN2 = YugabyteYSQL.connect(@conninfo)
-		CONN2.type_map_for_results = YugabyteYSQL::BasicTypeMapForResults.new(CONN2)
+		CONN2 = YSQL.connect(@conninfo)
+		CONN2.type_map_for_results = YSQL::BasicTypeMapForResults.new(CONN2)
 
 		RES1 = CONN2.exec("SELECT 234")
 
 		TUP1 = RES1.tuple(0)
 
-		TM3 = YugabyteYSQL::TypeMapByClass.new
-		CPYENC = YugabyteYSQL::TextEncoder::CopyRow.new type_map: TM3
-		RECENC = YugabyteYSQL::TextEncoder::Record.new type_map: TM3
+		TM3 = YSQL::TypeMapByClass.new
+		CPYENC = YSQL::TextEncoder::CopyRow.new type_map: TM3
+		RECENC = YSQL::TextEncoder::Record.new type_map: TM3
 
 		begin
 			# Use GC.verify_compaction_references instead of GC.compact .
@@ -68,12 +68,12 @@ describe "GC.compact", if: GC.respond_to?(:compact) do
 	end
 
 	it "should compact PG::CompositeCoder #327" do
-		e2 = YugabyteYSQL::TextEncoder::Array.new elements_type: E1
+		e2 = YSQL::TextEncoder::Array.new elements_type: E1
 		expect( e2.encode([5]) ).to eq("{5}")
 	end
 
 	it "should compact PG::TypeMap#default_type_map" do
-		expect( TM2.default_type_map ).to be_kind_of(YugabyteYSQL::TypeMapInRuby )
+		expect( TM2.default_type_map ).to be_kind_of(YSQL::TypeMapInRuby )
 	end
 
 	it "should compact PG::TypeMapByColumn" do
@@ -82,7 +82,7 @@ describe "GC.compact", if: GC.respond_to?(:compact) do
 	end
 
 	it "should compact PG::Connection" do
-		expect( TMBC.coders[0] ).to be_kind_of(YugabyteYSQL::TextDecoder::Float)
+		expect( TMBC.coders[0] ).to be_kind_of(YSQL::TextDecoder::Float)
 	end
 
 	it "should compact PG::Result" do

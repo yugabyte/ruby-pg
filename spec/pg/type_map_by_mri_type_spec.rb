@@ -3,17 +3,17 @@
 
 require_relative '../helpers'
 
-require 'yugabyte_ysql'
+require 'ysql'
 
 
-describe YugabyteYSQL::TypeMapByMriType do
+describe YSQL::TypeMapByMriType do
 
-	let!(:textenc_int){ YugabyteYSQL::TextEncoder::Integer.new name: 'INT4', oid: 23 }
-	let!(:textenc_float){ YugabyteYSQL::TextEncoder::Float.new name: 'FLOAT8', oid: 701 }
-	let!(:textenc_string){ YugabyteYSQL::TextEncoder::String.new name: 'TEXT', oid: 25 }
-	let!(:binaryenc_int){ YugabyteYSQL::BinaryEncoder::Int8.new name: 'INT8', oid: 20, format: 1 }
+	let!(:textenc_int){ YSQL::TextEncoder::Integer.new name: 'INT4', oid: 23 }
+	let!(:textenc_float){ YSQL::TextEncoder::Float.new name: 'FLOAT8', oid: 701 }
+	let!(:textenc_string){ YSQL::TextEncoder::String.new name: 'TEXT', oid: 25 }
+	let!(:binaryenc_int){ YSQL::BinaryEncoder::Int8.new name: 'INT8', oid: 20, format: 1 }
 	let!(:pass_through_type) do
-		type = Class.new(YugabyteYSQL::SimpleEncoder) do
+		type = Class.new(YSQL::SimpleEncoder) do
 			def encode(*v)
 				v.inspect
 			end
@@ -25,7 +25,7 @@ describe YugabyteYSQL::TypeMapByMriType do
 	end
 
 	let!(:tm) do
-		tm = YugabyteYSQL::TypeMapByMriType.new
+		tm = YSQL::TypeMapByMriType.new
 		tm['T_FIXNUM'] = binaryenc_int
 		tm['T_FLOAT'] = textenc_float
 		tm['T_SYMBOL'] = pass_through_type
@@ -33,9 +33,9 @@ describe YugabyteYSQL::TypeMapByMriType do
 	end
 
 	let!(:derived_tm) do
-		tm = Class.new(YugabyteYSQL::TypeMapByMriType) do
+		tm = Class.new(YSQL::TypeMapByMriType) do
 			def array_type_map_for(value)
-				YugabyteYSQL::TextEncoder::Array.new name: '_INT4', oid: 1007, elements_type: YugabyteYSQL::TextEncoder::Integer.new
+				YSQL::TextEncoder::Array.new name: '_INT4', oid: 1007, elements_type: YSQL::TextEncoder::Integer.new
 			end
 		end.new
 		tm['T_FIXNUM'] = proc{|value| textenc_int }
@@ -45,7 +45,7 @@ describe YugabyteYSQL::TypeMapByMriType do
 	end
 
 	it "should give account about memory usage" do
-		tm = YugabyteYSQL::TypeMapByMriType.new
+		tm = YSQL::TypeMapByMriType.new
 		expect( ObjectSpace.memsize_of(tm) ).to be > DATA_OBJ_MEMSIZE
 	end
 
@@ -93,10 +93,10 @@ describe YugabyteYSQL::TypeMapByMriType do
 	end
 
 	it "forwards query param conversions to the #default_type_map" do
-		tm1 = YugabyteYSQL::TypeMapByColumn.new([textenc_int, nil, nil] )
+		tm1 = YSQL::TypeMapByColumn.new([textenc_int, nil, nil] )
 
-		tm2 = YugabyteYSQL::TypeMapByMriType.new
-		tm2['T_FIXNUM'] = YugabyteYSQL::TextEncoder::Integer.new name: 'INT2', oid: 21
+		tm2 = YSQL::TypeMapByMriType.new
+		tm2['T_FIXNUM'] = YSQL::TextEncoder::Integer.new name: 'INT2', oid: 21
 		tm2.default_type_map = tm1
 
 		res = @conn.exec_params( "SELECT $1, $2, $3::TEXT", ['1', 2, 3], 0, tm2 )

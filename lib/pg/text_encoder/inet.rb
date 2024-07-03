@@ -3,7 +3,7 @@
 
 require 'ipaddr'
 
-module YugabyteYSQL
+module YSQL
 	module TextEncoder
 		class Inet < SimpleEncoder
 			def encode(value)

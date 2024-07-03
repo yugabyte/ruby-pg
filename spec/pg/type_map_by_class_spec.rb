@@ -3,17 +3,17 @@
 
 require_relative '../helpers'
 
-require 'yugabyte_ysql'
+require 'ysql'
 
 
-describe YugabyteYSQL::TypeMapByClass do
+describe YSQL::TypeMapByClass do
 
-	let!(:textenc_int){ YugabyteYSQL::TextEncoder::Integer.new(name: 'INT4', oid: 23).freeze }
-	let!(:textenc_float){ YugabyteYSQL::TextEncoder::Float.new(name: 'FLOAT8', oid: 701).freeze }
-	let!(:textenc_string){ YugabyteYSQL::TextEncoder::String.new(name: 'TEXT', oid: 25).freeze }
-	let!(:binaryenc_int){ YugabyteYSQL::BinaryEncoder::Int8.new(name: 'INT8', oid: 20, format: 1).freeze }
+	let!(:textenc_int){ YSQL::TextEncoder::Integer.new(name: 'INT4', oid: 23).freeze }
+	let!(:textenc_float){ YSQL::TextEncoder::Float.new(name: 'FLOAT8', oid: 701).freeze }
+	let!(:textenc_string){ YSQL::TextEncoder::String.new(name: 'TEXT', oid: 25).freeze }
+	let!(:binaryenc_int){ YSQL::BinaryEncoder::Int8.new(name: 'INT8', oid: 20, format: 1).freeze }
 	let!(:pass_through_type) do
-		type = Class.new(YugabyteYSQL::SimpleEncoder) do
+		type = Class.new(YSQL::SimpleEncoder) do
 			def encode(*v)
 				v.inspect
 			end
@@ -25,7 +25,7 @@ describe YugabyteYSQL::TypeMapByClass do
 	end
 
 	let!(:tm) do
-		tm = YugabyteYSQL::TypeMapByClass.new
+		tm = YSQL::TypeMapByClass.new
 		tm[Integer] = binaryenc_int
 		tm[Float] = textenc_float
 		tm[Symbol] = pass_through_type
@@ -33,7 +33,7 @@ describe YugabyteYSQL::TypeMapByClass do
 	end
 
 	let!(:tm_writable) do
-		tm_writable = YugabyteYSQL::TypeMapByClass.new
+		tm_writable = YSQL::TypeMapByClass.new
 		tm.coders.each do |k, v|
 			tm_writable[k] = v
 		end
@@ -45,9 +45,9 @@ describe YugabyteYSQL::TypeMapByClass do
 	end
 
 	let!(:derived_tm) do
-		tm = Class.new(YugabyteYSQL::TypeMapByClass) do
+		tm = Class.new(YSQL::TypeMapByClass) do
 			def array_type_map_for(value)
-				YugabyteYSQL::TextEncoder::Array.new name: '_INT4', oid: 1007, elements_type: YugabyteYSQL::TextEncoder::Integer.new
+				YSQL::TextEncoder::Array.new name: '_INT4', oid: 1007, elements_type: YSQL::TextEncoder::Integer.new
 			end
 		end.new
 		tm[Integer] = proc{|value| textenc_int }
@@ -57,7 +57,7 @@ describe YugabyteYSQL::TypeMapByClass do
 	end
 
 	it "should deny changes when frozen" do
-		expect{ tm.default_type_map = YugabyteYSQL::TypeMapByClass.new }.to raise_error(FrozenError)
+		expect{ tm.default_type_map = YSQL::TypeMapByClass.new }.to raise_error(FrozenError)
 		expect{ tm[Integer] = nil }.to raise_error(FrozenError)
 	end
 
@@ -95,10 +95,10 @@ describe YugabyteYSQL::TypeMapByClass do
 	end
 
 	it "forwards query param conversions to the #default_type_map" do
-		tm1 = YugabyteYSQL::TypeMapByColumn.new([textenc_int, nil, nil] )
+		tm1 = YSQL::TypeMapByColumn.new([textenc_int, nil, nil] )
 
-		tm2 = YugabyteYSQL::TypeMapByClass.new
-		tm2[Integer] = YugabyteYSQL::TextEncoder::Integer.new name: 'INT2', oid: 21
+		tm2 = YSQL::TypeMapByClass.new
+		tm2[Integer] = YSQL::TextEncoder::Integer.new name: 'INT2', oid: 21
 		tm2.default_type_map = tm1
 
 		res = @conn.exec_params( "SELECT $1, $2, $3::TEXT", ['1', 2, 3], 0, tm2 )

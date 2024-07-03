@@ -3,7 +3,7 @@
 # frozen_string_literal: true
 
 # The top-level PG namespace.
-module YugabyteYSQL
+module YSQL
 
 	# Is this file part of a fat binary gem with bundled libpq?
 	bundled_libpq_path = File.join(__dir__, RUBY_PLATFORM.gsub(/^i386-/, "x86-"))

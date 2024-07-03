@@ -1,6 +1,6 @@
 # -*- ruby -*-
 
-require 'yugabyte_ysql'
+require 'ysql'
 
 $stdout.sync = true
 
@@ -21,9 +21,9 @@ end
 
 # Start the (synchronous) connection
 output_progress "Starting connection..."
-conn = YugabyteYSQL.connect(CONN_OPTS ) or abort "Unable to create a new connection!"
+conn = YSQL.connect(CONN_OPTS ) or abort "Unable to create a new connection!"
 
-abort "Connect failed: %s" % [ conn.error_message ] unless conn.status == YugabyteYSQL::CONNECTION_OK
+abort "Connect failed: %s" % [ conn.error_message ] unless conn.status == YSQL::CONNECTION_OK
 
 # Now grab a reference to the underlying socket to select() on while the query is running
 socket = conn.socket_io

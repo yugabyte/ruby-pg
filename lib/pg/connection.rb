@@ -1,7 +1,7 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-require 'yugabyte_ysql' unless defined?( YugabyteYSQL )
+require 'ysql' unless defined?( YSQL )
 require 'io/wait' unless ::IO.public_instance_methods(false).include?(:wait_readable)
 require 'socket'
 require_relative 'load_balance_service'
@@ -28,7 +28,7 @@ require_relative 'load_balance_service'
 # 3. #sync_exec - the method version that is implemented by blocking function(s) of libpq.
 #
 # Sync and async version of the method can be switched by Connection.async_api= , however it is not recommended to change the default.
-class YugabyteYSQL::Connection
+class YSQL::Connection
 
 	# The order the options are passed to the ::connect method.
 	CONNECT_ARGUMENT_ORDER = %w[host port options tty dbname user password load_balance topology_keys yb_servers_refresh_interval fallback_to_topology_keys_only failed_host_reconnect_delay_secs].freeze
@@ -81,8 +81,8 @@ class YugabyteYSQL::Connection
 				# Option or URL string style
 				conn_string = args.first.to_s
 				# extract and parse lb properties from conn_string
-				conn_string, lb_props = YugabyteYSQL::LoadBalanceService.parse_lb_args_from_url conn_string
-				iopts = YugabyteYSQL::Connection.conninfo_parse(conn_string).each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }
+				conn_string, lb_props = YSQL::LoadBalanceService.parse_lb_args_from_url conn_string
+				iopts = YSQL::Connection.conninfo_parse(conn_string).each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }
 			else
 				# Positional parameters (only host given)
 				iopts[CONNECT_ARGUMENT_ORDER.first.to_sym] = args.first
@@ -99,7 +99,7 @@ class YugabyteYSQL::Connection
 			iopts.delete(:tty) # ignore obsolete tty parameter
 		end
 
-		lb_props = YugabyteYSQL::LoadBalanceService.parse_connect_lb_args hash_arg unless hash_arg.empty?
+		lb_props = YSQL::LoadBalanceService.parse_connect_lb_args hash_arg unless hash_arg.empty?
 
 		iopts.merge!( hash_arg )
 
@@ -117,13 +117,13 @@ class YugabyteYSQL::Connection
 			" finished"
 		else
 			stats = []
-			stats << " status=#{ YugabyteYSQL.constants.grep(/CONNECTION_/).find{|c| YugabyteYSQL.const_get(c) == status} }" if status != CONNECTION_OK
-			stats << " transaction_status=#{ YugabyteYSQL.constants.grep(/PQTRANS_/).find{|c| YugabyteYSQL.const_get(c) == transaction_status} }" if transaction_status != YugabyteYSQL::PQTRANS_IDLE
+			stats << " status=#{ YSQL.constants.grep(/CONNECTION_/).find{|c| YSQL.const_get(c) == status} }" if status != CONNECTION_OK
+			stats << " transaction_status=#{ YSQL.constants.grep(/PQTRANS_/).find{|c| YSQL.const_get(c) == transaction_status} }" if transaction_status != YSQL::PQTRANS_IDLE
 			stats << " nonblocking=#{ isnonblocking }" if isnonblocking
-			stats << " pipeline_status=#{ YugabyteYSQL.constants.grep(/PQ_PIPELINE_/).find{|c| YugabyteYSQL.const_get(c) == pipeline_status} }" if respond_to?(:pipeline_status) && pipeline_status != YugabyteYSQL::PQ_PIPELINE_OFF
+			stats << " pipeline_status=#{ YSQL.constants.grep(/PQ_PIPELINE_/).find{|c| YSQL.const_get(c) == pipeline_status} }" if respond_to?(:pipeline_status) && pipeline_status != YSQL::PQ_PIPELINE_OFF
 			stats << " client_encoding=#{ get_client_encoding }" if get_client_encoding != "UTF8"
-			stats << " type_map_for_results=#{ type_map_for_results.to_s }" unless type_map_for_results.is_a?(YugabyteYSQL::TypeMapAllStrings)
-			stats << " type_map_for_queries=#{ type_map_for_queries.to_s }" unless type_map_for_queries.is_a?(YugabyteYSQL::TypeMapAllStrings)
+			stats << " type_map_for_results=#{ type_map_for_results.to_s }" unless type_map_for_results.is_a?(YSQL::TypeMapAllStrings)
+			stats << " type_map_for_queries=#{ type_map_for_queries.to_s }" unless type_map_for_queries.is_a?(YSQL::TypeMapAllStrings)
 			stats << " encoder_for_put_copy_data=#{ encoder_for_put_copy_data.to_s }" if encoder_for_put_copy_data
 			stats << " decoder_for_get_copy_data=#{ decoder_for_get_copy_data.to_s }" if decoder_for_get_copy_data
 			" host=#{host} port=#{port} user=#{user}#{stats.join}"
@@ -223,7 +223,7 @@ class YugabyteYSQL::Connection
 	#   ["more", "data", "to", "copy"]
 
 	def copy_data( sql, coder=nil )
-		raise YugabyteYSQL::NotInBlockingMode.new("copy_data can not be used in nonblocking mode", connection: self) if nonblocking?
+		raise YSQL::NotInBlockingMode.new("copy_data can not be used in nonblocking mode", connection: self) if nonblocking?
 		res = exec( sql )
 
 		case res.result_status
@@ -244,7 +244,7 @@ class YugabyteYSQL::Connection
 				errmsg = "%s while copy data: %s" % [ err.class.name, err.message ]
 				begin
 					put_copy_end( errmsg )
-				rescue YugabyteYSQL::Error
+				rescue YSQL::Error
 					# Ignore error in cleanup to avoid losing original exception
 				end
 				discard_results
@@ -258,8 +258,8 @@ class YugabyteYSQL::Connection
 					end
 
 					put_copy_end
-				rescue YugabyteYSQL::Error => err
-					raise YugabyteYSQL::LostCopyState.new("#{err} (probably by executing another SQL query while running a COPY command)", connection: self)
+				rescue YSQL::Error => err
+					raise YSQL::LostCopyState.new("#{err} (probably by executing another SQL query while running a COPY command)", connection: self)
 				end
 				get_last_result
 			ensure
@@ -283,16 +283,16 @@ class YugabyteYSQL::Connection
 					# The file trailer is expected to be processed by BinaryDecoder::CopyRow and already returns nil, so that the remaining NULL from PQgetCopyData is retrieved here:
 					if get_copy_data
 						discard_results
-						raise YugabyteYSQL::NotAllCopyDataRetrieved.new("Not all binary COPY data retrieved", connection: self)
+						raise YSQL::NotAllCopyDataRetrieved.new("Not all binary COPY data retrieved", connection: self)
 					end
 				end
 				res = get_last_result
 				if !res
 					discard_results
-					raise YugabyteYSQL::LostCopyState.new("Lost COPY state (probably by executing another SQL query while running a COPY command)", connection: self)
+					raise YSQL::LostCopyState.new("Lost COPY state (probably by executing another SQL query while running a COPY command)", connection: self)
 				elsif res.result_status != PGRES_COMMAND_OK
 					discard_results
-					raise YugabyteYSQL::NotAllCopyDataRetrieved.new("Not all COPY data retrieved", connection: self)
+					raise YSQL::NotAllCopyDataRetrieved.new("Not all COPY data retrieved", connection: self)
 				end
 				res
 			ensure
@@ -306,7 +306,7 @@ class YugabyteYSQL::Connection
 
 	# Backward-compatibility aliases for stuff that's moved into PG.
 	class << self
-		define_method( :isthreadsafe, &YugabyteYSQL.method(:isthreadsafe) )
+		define_method( :isthreadsafe, &YSQL.method(:isthreadsafe) )
 	end
 
 	#
@@ -322,7 +322,7 @@ class YugabyteYSQL::Connection
 		yield(self)
 	rescue Exception
 		rollback = true
-		cancel if transaction_status == YugabyteYSQL::PQTRANS_ACTIVE
+		cancel if transaction_status == YSQL::PQTRANS_ACTIVE
 		block
 		exec "ROLLBACK"
 		raise
@@ -333,7 +333,14 @@ class YugabyteYSQL::Connection
 	### Returns an array of Hashes with connection defaults. See ::conndefaults
 	### for details.
 	def conndefaults
-		return self.class.conndefaults
+		original = self.class.conndefaults
+		original << {:keyword=>"load_balance", :label=>"YB-Load-Balance", :dispchar=>"", :dispsize=>5}
+		original << {:keyword=>"topology_keys", :label=>"YB-Topology-Keys", :dispchar=>"", :dispsize=>64}
+		original << {:keyword=>"yb_servers_refresh_interval", :label=>"YB-Refresh-Interval", :dispchar=>"", :dispsize=>3}
+		original << {:keyword=>"fallback_to_topology_keys_only", :label=>"YB-Fallback-To-Topology-Keys-Only", :dispchar=>"", :dispsize=>5}
+		original << {:keyword=>"failed_host_reconnect_delay_secs", :label=>"YB-Failed-Host-Reconnect-Delay", :dispchar=>"", :dispsize=>3}
+
+		original
 	end
 
 	### Return the Postgres connection defaults structure as a Hash keyed by option
@@ -580,7 +587,7 @@ class YugabyteYSQL::Connection
 	# backend connection and tries to re-connect.
 	def reset
 		iopts = conninfo_hash.compact
-		if iopts[:host] && !iopts[:host].empty? && YugabyteYSQL.library_version >= 100000
+		if iopts[:host] && !iopts[:host].empty? && YSQL.library_version >= 100000
 			iopts = self.class.send(:resolve_hosts, iopts)
 		end
 		conninfo = self.class.parse_connect_args( iopts );
@@ -663,9 +670,9 @@ class YugabyteYSQL::Connection
 			stop_time = timeo * host_count + Process.clock_gettime(Process::CLOCK_MONOTONIC)
 		end
 
-		poll_status = YugabyteYSQL::PGRES_POLLING_WRITING
-		until poll_status == YugabyteYSQL::PGRES_POLLING_OK ||
-				poll_status == YugabyteYSQL::PGRES_POLLING_FAILED
+		poll_status = YSQL::PGRES_POLLING_WRITING
+		until poll_status == YSQL::PGRES_POLLING_OK ||
+				poll_status == YSQL::PGRES_POLLING_FAILED
 
 			# Set single timeout to parameter "connect_timeout" but
 			# don't exceed total connection time of number-of-hosts * connect_timeout.
@@ -673,7 +680,7 @@ class YugabyteYSQL::Connection
 			event = if !timeout || timeout >= 0
 				# If the socket needs to read, wait 'til it becomes readable to poll again
 				case poll_status
-				when YugabyteYSQL::PGRES_POLLING_READING
+				when YSQL::PGRES_POLLING_READING
 					if defined?(IO::READABLE) # ruby-3.0+
 						socket_io.wait(IO::READABLE | IO::PRIORITY, timeout)
 					else
@@ -681,7 +688,7 @@ class YugabyteYSQL::Connection
 					end
 
 				# ...and the same for when the socket needs to write
-				when YugabyteYSQL::PGRES_POLLING_WRITING
+				when YSQL::PGRES_POLLING_WRITING
 					if defined?(IO::WRITABLE) # ruby-3.0+
 						# Use wait instead of wait_readable, since connection errors are delivered as
 						# exceptional/priority events on Windows.
@@ -702,17 +709,17 @@ class YugabyteYSQL::Connection
 				else
 					connhost = "at \"#{host}\", port #{port}"
 				end
-				raise YugabyteYSQL::ConnectionBad.new("connection to server #{connhost} failed: timeout expired", connection: self)
+				raise YSQL::ConnectionBad.new("connection to server #{connhost} failed: timeout expired", connection: self)
 			end
 
 			# Check to see if it's finished or failed yet
 			poll_status = send( poll_meth )
 		end
 
-		unless status == YugabyteYSQL::CONNECTION_OK
+		unless status == YSQL::CONNECTION_OK
 			msg = error_message
 			finish
-			raise YugabyteYSQL::ConnectionBad.new(msg, connection: self)
+			raise YSQL::ConnectionBad.new(msg, connection: self)
 		end
 
 		# Set connection to nonblocking to handle all blocking states in ruby.
@@ -800,7 +807,7 @@ class YugabyteYSQL::Connection
 			iports = iopts[:port].split(",", -1)
 			iports = [nil] if iports.size == 0
 			iports = iports * ihosts.size if iports.size == 1
-			raise YugabyteYSQL::ConnectionBad, "could not match #{iports.size} port numbers to #{ihosts.size} hosts" if iports.size != ihosts.size
+			raise YSQL::ConnectionBad, "could not match #{iports.size} port numbers to #{ihosts.size} hosts" if iports.size != ihosts.size
 
 			dests = ihosts.each_with_index.flat_map do |mhost, idx|
 				unless host_is_named_pipe?(mhost)
@@ -828,13 +835,13 @@ class YugabyteYSQL::Connection
 
 		private def connect_to_hosts(*args)
 			option_string, lb_properties = parse_connect_args_and_return_lb_props(*args)
-			iopts = YugabyteYSQL::Connection.conninfo_parse(option_string).each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }
-			iopts = YugabyteYSQL::Connection.conndefaults.each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }.merge(iopts)
+			iopts = YSQL::Connection.conninfo_parse(option_string).each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }
+			iopts = YSQL::Connection.conndefaults.each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }.merge(iopts)
 			original_host = iopts[:host]
 			original_port = iopts[:port]
 
 			if lb_properties
-				connection = YugabyteYSQL::LoadBalanceService.connect_to_lb_hosts(lb_properties, iopts)
+				connection = YSQL::LoadBalanceService.connect_to_lb_hosts(lb_properties, iopts)
 			end
 			if connection.nil?
 				if lb_properties
@@ -850,15 +857,15 @@ class YugabyteYSQL::Connection
 			if iopts[:hostaddr]
 				# hostaddr is provided -> no need to resolve hostnames
 
-			elsif iopts[:host] && !iopts[:host].empty? && YugabyteYSQL.library_version >= 100000
+			elsif iopts[:host] && !iopts[:host].empty? && YSQL.library_version >= 100000
 				iopts = resolve_hosts(iopts)
 			else
 				# No host given
 			end
 			conn = self.connect_start(iopts) or
-										raise(YugabyteYSQL::Error, "Unable to create a new connection")
+										raise(YSQL::Error, "Unable to create a new connection")
 
-			raise YugabyteYSQL::ConnectionBad, conn.error_message if conn.status == YugabyteYSQL::CONNECTION_BAD
+			raise YSQL::ConnectionBad, conn.error_message if conn.status == YSQL::CONNECTION_BAD
 
 			conn.send(:async_connect_or_reset, :connect_poll)
 			conn
@@ -905,7 +912,7 @@ class YugabyteYSQL::Connection
 		end
 		alias async_ping ping
 
-		REDIRECT_CLASS_METHODS = YugabyteYSQL.make_shareable({
+		REDIRECT_CLASS_METHODS = YSQL.make_shareable({
 			:new => [:async_connect, :sync_connect],
 			:connect => [:async_connect, :sync_connect],
 			:open => [:async_connect, :sync_connect],
@@ -916,7 +923,7 @@ class YugabyteYSQL::Connection
 		private_constant :REDIRECT_CLASS_METHODS
 
 		# These methods are affected by PQsetnonblocking
-		REDIRECT_SEND_METHODS = YugabyteYSQL.make_shareable({
+		REDIRECT_SEND_METHODS = YSQL.make_shareable({
 			:isnonblocking => [:async_isnonblocking, :sync_isnonblocking],
 			:nonblocking? => [:async_isnonblocking, :sync_isnonblocking],
 			:put_copy_data => [:async_put_copy_data, :sync_put_copy_data],
@@ -943,12 +950,12 @@ class YugabyteYSQL::Connection
 		}
 		private_constant :REDIRECT_METHODS
 
-		if YugabyteYSQL::Connection.instance_methods.include? :async_encrypt_password
+		if YSQL::Connection.instance_methods.include? :async_encrypt_password
 			REDIRECT_METHODS.merge!({
 				:encrypt_password => [:async_encrypt_password, :sync_encrypt_password],
 			})
 		end
-		YugabyteYSQL.make_shareable(REDIRECT_METHODS)
+		YSQL.make_shareable(REDIRECT_METHODS)
 
 		def async_send_api=(enable)
 			REDIRECT_SEND_METHODS.each do |ali, (async, sync)|

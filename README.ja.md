@@ -1,4 +1,4 @@
-# pg
+# yugabytedb-ysql
 
 * ホーム :: https://github.com/ged/ruby-pg
 * ドキュメント :: http://deveiate.org/code/pg （英語）、 https://deveiate.org/code/pg/README_ja_md.html （日本語）
@@ -19,10 +19,10 @@ RDBMS](http://www.postgresql.org/)へのRubyのインターフェースです。
 ```ruby
   #!/usr/bin/env ruby
 
-  require 'pg'
+  require 'ysql'
 
   # データベースへの現在の接続を表に出力します
-  conn = YugabyteYSQL.connect( dbname: 'sales' )
+  conn = YSQL.connect( dbname: 'sales' )
   conn.exec( "SELECT * FROM pg_stat_activity" ) do |result|
     puts "     PID | User             | Query"
     result.each do |row|
@@ -57,18 +57,18 @@ Actionsのビルド状況](https://github.com/ged/ruby-pg/actions/workflows/sour
 例えば次の通りです。
 
 ```ruby
-  spec.add_dependency 'pg', '~> 1.0'
+  spec.add_dependency 'yugabytedb-ysql', '~> 1.0'
 ```
 
 ## インストール方法
 
 RubyGemsを経由してインストールするには以下とします。
 
-    gem install pg
+    gem install yugabytedb-ysql
 
 Postgresと一緒にインストールされた'pg_config'プログラムへのパスを指定する必要があるかもしれません。
 
-    gem install pg -- --with-pg-config=<path to pg_config>
+    gem install yugabytedb-ysql -- --with-pg-config=<path to pg_config>
 
 Bundlerを介してインストールした場合は次のようにコンパイルのためのヒントを与えられます。
 
@@ -91,12 +91,12 @@ Pgでは任意でRubyと素のCコードにある結果の値やクエリ引数�
 とても基本的な型変換は次のようにできます。
 
 ```ruby
-    conn.type_map_for_results = YugabyteYSQL::BasicTypeMapForResults.new conn
+    conn.type_map_for_results = YSQL::BasicTypeMapForResults.new conn
 # ……これは結果の値の対応付けに作用します。
 conn.exec("select 1, now(), '{2,3}'::int[]").values
 # => [[1, 2014-09-21 20:51:56 +0200, [2, 3]]]
 
-conn.type_map_for_queries = YugabyteYSQL::BasicTypeMapForQueries.new conn
+conn.type_map_for_queries = YSQL::BasicTypeMapForQueries.new conn
 # ……そしてこれは引数値の対応付けのためのものです。
 conn.exec_params("SELECT $1::text, $2::text, $3::text", [1, 1.23, [2, 3]]).values
 # => [["1", "1.2300000000000000E+00", "{2,3}"]]

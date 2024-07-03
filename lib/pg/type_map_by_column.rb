@@ -1,9 +1,9 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-require 'yugabyte_ysql' unless defined?( YugabyteYSQL )
+require 'ysql' unless defined?( YSQL )
 
-class YugabyteYSQL::TypeMapByColumn
+class YSQL::TypeMapByColumn
 	# Returns the type oids of the assigned coders.
 	def oids
 		coders.map{|c| c.oid if c }

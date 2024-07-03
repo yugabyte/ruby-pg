@@ -1,6 +1,6 @@
 # -*- ruby -*-
 
-# Specify your gem's runtime dependencies in yugabyte_ysql.gemspec
+# Specify your gem's runtime dependencies in yugabytedb-ysql.gemspec
 gemspec
 
 source "https://rubygems.org/"

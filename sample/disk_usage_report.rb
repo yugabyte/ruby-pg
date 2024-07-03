@@ -13,7 +13,7 @@
 require 'ostruct'
 require 'optparse'
 require 'etc'
-require 'yugabyte_ysql'
+require 'ysql'
 
 SCRIPT_VERSION = %q$Id$
 
@@ -21,7 +21,7 @@ SCRIPT_VERSION = %q$Id$
 ### Gather data and output it to $stdout.
 ###
 def report( opts )
-	db = YugabyteYSQL.connect(
+	db = YSQL.connect(
 		:dbname   => opts.database,
 		:host     => opts.host,
 		:port     => opts.port,

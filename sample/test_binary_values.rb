@@ -1,8 +1,8 @@
 # -*- ruby -*-1.9.1
 
-require 'yugabyte_ysql'
+require 'ysql'
 
-db = YugabyteYSQL.connect(:dbname => 'test' )
+db = YSQL.connect(:dbname => 'test' )
 db.exec "DROP TABLE IF EXISTS test"
 db.exec "CREATE TABLE test (a INTEGER, b BYTEA)"
 

@@ -1,10 +1,10 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-require 'yugabyte_ysql' unless defined?( YugabyteYSQL )
+require 'ysql' unless defined?( YSQL )
 
 
-class YugabyteYSQL::Result
+class YSQL::Result
 
 	# Apply a type map for all value retrieving methods.
 	#

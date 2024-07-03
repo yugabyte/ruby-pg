@@ -3,26 +3,26 @@
 
 require_relative '../helpers'
 
-require 'yugabyte_ysql'
+require 'ysql'
 
 
-describe YugabyteYSQL::Result do
+describe YSQL::Result do
 
 	it "provides res_status" do
-		str = YugabyteYSQL::Result.res_status(YugabyteYSQL::PGRES_EMPTY_QUERY)
+		str = YSQL::Result.res_status(YSQL::PGRES_EMPTY_QUERY)
 		expect( str ).to eq("PGRES_EMPTY_QUERY")
 		expect( str.encoding ).to eq(Encoding::UTF_8)
 
 		res = @conn.exec("SELECT 1")
 		expect( res.res_status ).to eq("PGRES_TUPLES_OK")
-		expect( res.res_status(YugabyteYSQL::PGRES_FATAL_ERROR) ).to eq("PGRES_FATAL_ERROR")
+		expect( res.res_status(YSQL::PGRES_FATAL_ERROR) ).to eq("PGRES_FATAL_ERROR")
 
 		expect{ res.res_status(1,2) }.to raise_error(ArgumentError)
 	end
 
 	it "should deny changes when frozen" do
 		res = @conn.exec("SELECT 1").freeze
-		expect{ res.type_map = YugabyteYSQL::TypeMapAllStrings.new }.to raise_error(FrozenError)
+		expect{ res.type_map = YSQL::TypeMapAllStrings.new }.to raise_error(FrozenError)
 		expect{ res.field_name_type = :symbol  }.to raise_error(FrozenError)
 		expect{ res.clear }.to raise_error(FrozenError)
 	end
@@ -34,13 +34,13 @@ describe YugabyteYSQL::Result do
 
 	it "should be usable with Ractor", :ractor do
 		res = Ractor.new(@conninfo) do |conninfo|
-			conn = YugabyteYSQL.connect(conninfo)
+			conn = YSQL.connect(conninfo)
 			conn.exec("SELECT 123 as col")
 		ensure
 			conn&.finish
 		end.take
 
-		expect( res ).to be_kind_of(YugabyteYSQL::Result )
+		expect( res ).to be_kind_of(YSQL::Result )
 		expect( res.fields ).to eq( ["col"] )
 		expect( res.values ).to eq( [["123"]] )
 	end
@@ -129,7 +129,7 @@ describe YugabyteYSQL::Result do
 	end
 
 	context "result streaming in single row mode" do
-		let!(:textdec_int){ YugabyteYSQL::TextDecoder::Integer.new name: 'INT4', oid: 23 }
+		let!(:textdec_int){ YSQL::TextDecoder::Integer.new name: 'INT4', oid: 23 }
 
 		it "can iterate over all rows as Hash" do
 			@conn.send_query( "SELECT generate_series(2,4) AS a; SELECT 1 AS b, generate_series(5,6) AS c" )
@@ -151,7 +151,7 @@ describe YugabyteYSQL::Result do
 			@conn.send_query( "SELECT generate_series(2,4) AS a" )
 			@conn.set_single_row_mode
 			res = @conn.get_result.field_names_as(:symbol)
-			res.type_map = YugabyteYSQL::TypeMapByColumn.new [textdec_int]
+			res.type_map = YSQL::TypeMapByColumn.new [textdec_int]
 			expect(
 				res.stream_each.to_a
 			).to eq(
@@ -239,7 +239,7 @@ describe YugabyteYSQL::Result do
 			@conn.send_query( "SELECT generate_series(2,4) AS a" )
 			@conn.set_single_row_mode
 			res = @conn.get_result.field_names_as(:symbol)
-			res.type_map = YugabyteYSQL::TypeMapByColumn.new [textdec_int]
+			res.type_map = YSQL::TypeMapByColumn.new [textdec_int]
 			tuples = res.stream_each_tuple.to_a
 			expect( tuples[0][0] ).to eq( 2 )
 			expect( tuples[1][:a] ).to eq( 3 )
@@ -260,7 +260,7 @@ describe YugabyteYSQL::Result do
 			@conn.send_query( "SELECT generate_series(2,4)" )
 			expect{
 				@conn.get_result.stream_each_row.to_a
-			}.to raise_error(YugabyteYSQL::InvalidResultStatus, /not in single row mode/)
+			}.to raise_error(YSQL::InvalidResultStatus, /not in single row mode/)
 		end
 
 		it "complains when intersected with get_result" do
@@ -268,14 +268,14 @@ describe YugabyteYSQL::Result do
 			@conn.set_single_row_mode
 			expect{
 				@conn.get_result.stream_each_row.each{ @conn.get_result }
-			}.to raise_error(YugabyteYSQL::NoResultError, /no result received/)
+			}.to raise_error(YSQL::NoResultError, /no result received/)
 		end
 
 		it "raises server errors" do
 			@conn.send_query( "SELECT 0/0" )
 			expect{
 				@conn.get_result.stream_each_row.to_a
-			}.to raise_error(YugabyteYSQL::DivisionByZero)
+			}.to raise_error(YSQL::DivisionByZero)
 		end
 
 		it "raises an error if result number of fields change" do
@@ -288,7 +288,7 @@ describe YugabyteYSQL::Result do
 					@conn.send_query("SELECT 2,3");
 					@conn.set_single_row_mode
 				end
-			}.to raise_error(YugabyteYSQL::InvalidChangeOfResultFields, /from 1 to 2 /)
+			}.to raise_error(YSQL::InvalidChangeOfResultFields, /from 1 to 2 /)
 			expect( res.cleared? ).to be true
 		end
 
@@ -301,7 +301,7 @@ describe YugabyteYSQL::Result do
 				@conn.get_result.stream_each_row do |row|
 					# No-op
 				end
-			}.to raise_error(YugabyteYSQL::QueryCanceled, /statement timeout/)
+			}.to raise_error(YSQL::QueryCanceled, /statement timeout/)
 		end
 
 		it "should deny streaming when frozen" do
@@ -323,30 +323,30 @@ describe YugabyteYSQL::Result do
 		exception = nil
 		begin
 			@conn.exec( "SELECT * FROM nonexistant_table" )
-		rescue YugabyteYSQL::Error => err
+		rescue YSQL::Error => err
 			exception = err
 		end
 
 		result = exception.result
 
 		expect( result ).to be_a( described_class() )
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_SEVERITY) ).to eq('ERROR' )
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_SQLSTATE) ).to eq('42P01' )
+		expect( result.error_field(YSQL::PG_DIAG_SEVERITY) ).to eq('ERROR' )
+		expect( result.error_field(YSQL::PG_DIAG_SQLSTATE) ).to eq('42P01' )
 		expect(
-			result.error_field(YugabyteYSQL::PG_DIAG_MESSAGE_PRIMARY)
+			result.error_field(YSQL::PG_DIAG_MESSAGE_PRIMARY)
 		).to eq( 'relation "nonexistant_table" does not exist' )
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_MESSAGE_DETAIL) ).to be_nil()
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_MESSAGE_HINT) ).to be_nil()
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_STATEMENT_POSITION) ).to eq('15' )
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_INTERNAL_POSITION) ).to be_nil()
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_INTERNAL_QUERY) ).to be_nil()
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_CONTEXT) ).to be_nil()
+		expect( result.error_field(YSQL::PG_DIAG_MESSAGE_DETAIL) ).to be_nil()
+		expect( result.error_field(YSQL::PG_DIAG_MESSAGE_HINT) ).to be_nil()
+		expect( result.error_field(YSQL::PG_DIAG_STATEMENT_POSITION) ).to eq('15' )
+		expect( result.error_field(YSQL::PG_DIAG_INTERNAL_POSITION) ).to be_nil()
+		expect( result.error_field(YSQL::PG_DIAG_INTERNAL_QUERY) ).to be_nil()
+		expect( result.error_field(YSQL::PG_DIAG_CONTEXT) ).to be_nil()
 		expect(
-			result.error_field(YugabyteYSQL::PG_DIAG_SOURCE_FILE)
+			result.error_field(YSQL::PG_DIAG_SOURCE_FILE)
 		).to match( /parse_relation\.c$|namespace\.c$/ )
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_SOURCE_LINE) ).to match(/^\d+$/ )
+		expect( result.error_field(YSQL::PG_DIAG_SOURCE_LINE) ).to match(/^\d+$/ )
 		expect(
-			result.error_field(YugabyteYSQL::PG_DIAG_SOURCE_FUNCTION)
+			result.error_field(YSQL::PG_DIAG_SOURCE_FUNCTION)
 		).to match( /^parserOpenTable$|^RangeVarGetRelid$/ )
 	end
 
@@ -354,11 +354,11 @@ describe YugabyteYSQL::Result do
 		result = nil
 		begin
 			@conn.exec( "SELECT * FROM nonexistant_table" )
-		rescue YugabyteYSQL::Error => err
+		rescue YSQL::Error => err
 			result = err.result
 		end
 
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_SEVERITY_NONLOCALIZED) ).to eq('ERROR' )
+		expect( result.error_field(YSQL::PG_DIAG_SEVERITY_NONLOCALIZED) ).to eq('ERROR' )
 	end
 
 	it "encapsulates database object names for integrity constraint violations" do
@@ -366,24 +366,24 @@ describe YugabyteYSQL::Result do
 		exception = nil
 		begin
 			@conn.exec( "INSERT INTO integrity VALUES (NULL)" )
-		rescue YugabyteYSQL::Error => err
+		rescue YSQL::Error => err
 			exception = err
 		end
 		result = exception.result
 
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_SCHEMA_NAME) ).to eq('public' )
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_TABLE_NAME) ).to eq('integrity' )
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_COLUMN_NAME) ).to eq('id' )
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_DATATYPE_NAME) ).to be_nil
-		expect( result.error_field(YugabyteYSQL::PG_DIAG_CONSTRAINT_NAME) ).to be_nil
+		expect( result.error_field(YSQL::PG_DIAG_SCHEMA_NAME) ).to eq('public' )
+		expect( result.error_field(YSQL::PG_DIAG_TABLE_NAME) ).to eq('integrity' )
+		expect( result.error_field(YSQL::PG_DIAG_COLUMN_NAME) ).to eq('id' )
+		expect( result.error_field(YSQL::PG_DIAG_DATATYPE_NAME) ).to be_nil
+		expect( result.error_field(YSQL::PG_DIAG_CONSTRAINT_NAME) ).to be_nil
 	end
 
 	it "detects division by zero as SQLSTATE 22012" do
 		sqlstate = nil
 		begin
 			@conn.exec("SELECT 1/0")
-		rescue YugabyteYSQL::Error => e
-			sqlstate = e.result.result_error_field(YugabyteYSQL::PG_DIAG_SQLSTATE ).to_i
+		rescue YSQL::Error => e
+			sqlstate = e.result.result_error_field(YSQL::PG_DIAG_SQLSTATE ).to_i
 		end
 		expect( sqlstate ).to eq( 22012 )
 	end
@@ -399,15 +399,15 @@ describe YugabyteYSQL::Result do
 		@conn.send_query("SELECT xyz")
 		res = @conn.get_result; @conn.get_result
 		# PQERRORS_TERSE should give a single line result
-		expect( res.verbose_error_message(YugabyteYSQL::PQERRORS_TERSE, YugabyteYSQL::PQSHOW_CONTEXT_ALWAYS) ).to match(/\A.*\n\z/)
+		expect( res.verbose_error_message(YSQL::PQERRORS_TERSE, YSQL::PQSHOW_CONTEXT_ALWAYS) ).to match(/\A.*\n\z/)
 		# PQERRORS_VERBOSE should give a multi line result
-		expect( res.result_verbose_error_message(YugabyteYSQL::PQERRORS_VERBOSE, YugabyteYSQL::PQSHOW_CONTEXT_NEVER) ).to match(/\n.*\n/)
+		expect( res.result_verbose_error_message(YSQL::PQERRORS_VERBOSE, YSQL::PQSHOW_CONTEXT_NEVER) ).to match(/\n.*\n/)
 	end
 
 	it "provides a verbose error message with SQLSTATE", :postgresql_12 do
 		@conn.send_query("SELECT xyz")
 		res = @conn.get_result; @conn.get_result
-		expect( res.verbose_error_message(YugabyteYSQL::PQERRORS_SQLSTATE, YugabyteYSQL::PQSHOW_CONTEXT_NEVER) ).to match(/42703/)
+		expect( res.verbose_error_message(YSQL::PQERRORS_SQLSTATE, YSQL::PQSHOW_CONTEXT_NEVER) ).to match(/42703/)
 	end
 
 	it "returns the same bytes in binary format that are sent in binary format" do
@@ -425,7 +425,7 @@ describe YugabyteYSQL::Result do
 		binary_file = File.join(Dir.pwd, 'spec/data', 'random_binary_data')
 		bytes = File.open(binary_file, 'rb').read
 		@conn.exec("SET standard_conforming_strings=on")
-		res = @conn.exec_params("VALUES ('#{YugabyteYSQL::Connection.escape_bytea(bytes)}'::bytea)", [], 1)
+		res = @conn.exec_params("VALUES ('#{YSQL::Connection.escape_bytea(bytes)}'::bytea)", [], 1)
 		expect( res[0]['column1'] ).to eq( bytes )
 		expect( res.getvalue(0,0) ).to eq( bytes )
 		expect( res.values[0][0] ).to eq( bytes )
@@ -437,7 +437,7 @@ describe YugabyteYSQL::Result do
 		bytes = File.open(binary_file, 'rb').read
 		res = @conn.exec_params('VALUES ($1::bytea)',
 			[ { :value => bytes, :format => 1 } ])
-		expect(YugabyteYSQL::Connection.unescape_bytea(res[0]['column1']) ).to eq(bytes )
+		expect(YSQL::Connection.unescape_bytea(res[0]['column1']) ).to eq(bytes )
 	end
 
 	it "returns the same bytes in text format that are sent as inline text" do
@@ -446,8 +446,8 @@ describe YugabyteYSQL::Result do
 
 		out_bytes = nil
 		@conn.exec("SET standard_conforming_strings=on")
-		res = @conn.exec_params("VALUES ('#{YugabyteYSQL::Connection.escape_bytea(in_bytes)}'::bytea)", [], 0)
-		out_bytes = YugabyteYSQL::Connection.unescape_bytea(res[0]['column1'])
+		res = @conn.exec_params("VALUES ('#{YSQL::Connection.escape_bytea(in_bytes)}'::bytea)", [], 0)
+		out_bytes = YSQL::Connection.unescape_bytea(res[0]['column1'])
 		expect( out_bytes ).to eq( in_bytes )
 	end
 
@@ -496,10 +496,10 @@ describe YugabyteYSQL::Result do
 
 	it "provides the result status" do
 		res = @conn.exec("SELECT 1")
-		expect( res.result_status ).to eq(YugabyteYSQL::PGRES_TUPLES_OK)
+		expect( res.result_status ).to eq(YSQL::PGRES_TUPLES_OK)
 
 		res = @conn.exec("")
-		expect( res.result_status ).to eq(YugabyteYSQL::PGRES_EMPTY_QUERY)
+		expect( res.result_status ).to eq(YSQL::PGRES_EMPTY_QUERY)
 	end
 
 	it "can retrieve number of fields" do
@@ -593,7 +593,7 @@ describe YugabyteYSQL::Result do
 	   "column with no corresponding table" do
 		@conn.exec( 'CREATE TABLE ftabletest ( foo text )' )
 		res = @conn.exec( 'SELECT foo, LENGTH(foo) as length FROM ftabletest' )
-		expect( res.ftable(1) ).to eq(YugabyteYSQL::INVALID_OID )
+		expect( res.ftable(1) ).to eq(YSQL::INVALID_OID )
 	end
 
 	# PQftablecol
@@ -631,7 +631,7 @@ describe YugabyteYSQL::Result do
 		res = @conn.get_result
 		expect {
 			res.check
-		}.to raise_error(YugabyteYSQL::Error, /relation "nonexistant_table" does not exist/ )
+		}.to raise_error(YSQL::Error, /relation "nonexistant_table" does not exist/ )
 	end
 
 	it "can return the values of a single field" do
@@ -654,8 +654,8 @@ describe YugabyteYSQL::Result do
 
 	it "can return the values of a single vary lazy tuple" do
 		res = @conn.exec( "VALUES(1),(2)" )
-		expect( res.tuple(0) ).to be_kind_of(YugabyteYSQL::Tuple )
-		expect( res.tuple(1) ).to be_kind_of(YugabyteYSQL::Tuple )
+		expect( res.tuple(0) ).to be_kind_of(YSQL::Tuple )
+		expect( res.tuple(1) ).to be_kind_of(YSQL::Tuple )
 		expect{ res.tuple(2) }.to raise_error(IndexError)
 		expect{ res.tuple(-1) }.to raise_error(IndexError)
 		expect{ res.tuple("x") }.to raise_error(TypeError)
@@ -664,51 +664,51 @@ describe YugabyteYSQL::Result do
 	it "raises a proper exception for a nonexistant table" do
 		expect {
 			@conn.exec( "SELECT * FROM nonexistant_table" )
-		}.to raise_error(YugabyteYSQL::UndefinedTable, /relation "nonexistant_table" does not exist/ )
+		}.to raise_error(YSQL::UndefinedTable, /relation "nonexistant_table" does not exist/ )
 	end
 
 	it "raises a more generic exception for an unknown SQLSTATE" do
-		old_error = YugabyteYSQL::ERROR_CLASSES.delete('42P01')
+		old_error = YSQL::ERROR_CLASSES.delete('42P01')
 		begin
 			expect {
 				@conn.exec( "SELECT * FROM nonexistant_table" )
 			}.to raise_error{|error|
-				expect( error ).to be_an_instance_of(YugabyteYSQL::SyntaxErrorOrAccessRuleViolation)
+				expect( error ).to be_an_instance_of(YSQL::SyntaxErrorOrAccessRuleViolation)
 				expect( error.to_s ).to match(/relation "nonexistant_table" does not exist/)
 			}
 		ensure
-			YugabyteYSQL::ERROR_CLASSES['42P01'] = old_error
+			YSQL::ERROR_CLASSES['42P01'] = old_error
 		end
 	end
 
 	it "raises a ServerError for an unknown SQLSTATE class" do
-		old_error1 = YugabyteYSQL::ERROR_CLASSES.delete('42P01')
-		old_error2 = YugabyteYSQL::ERROR_CLASSES.delete('42')
+		old_error1 = YSQL::ERROR_CLASSES.delete('42P01')
+		old_error2 = YSQL::ERROR_CLASSES.delete('42')
 		begin
 			expect {
 				@conn.exec( "SELECT * FROM nonexistant_table" )
 			}.to raise_error{|error|
-				expect( error ).to be_an_instance_of(YugabyteYSQL::ServerError)
+				expect( error ).to be_an_instance_of(YSQL::ServerError)
 				expect( error.to_s ).to match(/relation "nonexistant_table" does not exist/)
 			}
 		ensure
-			YugabyteYSQL::ERROR_CLASSES['42P01'] = old_error1
-			YugabyteYSQL::ERROR_CLASSES['42'] = old_error2
+			YSQL::ERROR_CLASSES['42P01'] = old_error1
+			YSQL::ERROR_CLASSES['42'] = old_error2
 		end
 	end
 
 	it "raises a proper exception for a nonexistant schema" do
 		expect {
 			@conn.exec( "DROP SCHEMA nonexistant_schema" )
-		}.to raise_error(YugabyteYSQL::InvalidSchemaName, /schema "nonexistant_schema" does not exist/ )
+		}.to raise_error(YSQL::InvalidSchemaName, /schema "nonexistant_schema" does not exist/ )
 	end
 
 	it "the raised result is nil in case of a connection error" do
-		c = YugabyteYSQL::Connection.connect_start('127.0.0.1', 54320, "", "", "me", "xxxx", "somedb" )
+		c = YSQL::Connection.connect_start('127.0.0.1', 54320, "", "", "me", "xxxx", "somedb" )
 		expect {
 			c.exec "select 1"
 		}.to raise_error {|error|
-			expect( error ).to be_an_instance_of(YugabyteYSQL::UnableToSend)
+			expect( error ).to be_an_instance_of(YSQL::UnableToSend)
 			expect( error.result ).to eq( nil )
 		}
 	end
@@ -736,36 +736,36 @@ describe YugabyteYSQL::Result do
 	end
 
 	it "doesn't define #allocate" do
-		expect{ YugabyteYSQL::Result.allocate }.to raise_error { |error|
+		expect{ YSQL::Result.allocate }.to raise_error { |error|
 			expect( error ).to satisfy { |v| [NoMethodError, TypeError].include?(v.class) }
 		}
 	end
 
 	it "doesn't define #new" do
-		expect{ YugabyteYSQL::Result.new }.to raise_error { |error|
+		expect{ YSQL::Result.new }.to raise_error { |error|
 			expect( error ).to satisfy { |v| [NoMethodError, TypeError].include?(v.class) }
 		}
 	end
 
 	context 'result value conversions with TypeMapByColumn' do
-		let!(:textdec_int){ YugabyteYSQL::TextDecoder::Integer.new name: 'INT4', oid: 23 }
-		let!(:textdec_float){ YugabyteYSQL::TextDecoder::Float.new name: 'FLOAT4', oid: 700 }
+		let!(:textdec_int){ YSQL::TextDecoder::Integer.new name: 'INT4', oid: 23 }
+		let!(:textdec_float){ YSQL::TextDecoder::Float.new name: 'FLOAT4', oid: 700 }
 
 		it "should allow reading, assigning and disabling type conversions" do
 			res = @conn.exec( "SELECT 123" )
-			expect( res.type_map ).to be_kind_of(YugabyteYSQL::TypeMapAllStrings)
-			res.type_map = YugabyteYSQL::TypeMapByColumn.new [textdec_int]
-			expect( res.type_map ).to be_an_instance_of(YugabyteYSQL::TypeMapByColumn)
+			expect( res.type_map ).to be_kind_of(YSQL::TypeMapAllStrings)
+			res.type_map = YSQL::TypeMapByColumn.new [textdec_int]
+			expect( res.type_map ).to be_an_instance_of(YSQL::TypeMapByColumn)
 			expect( res.type_map.coders ).to eq( [textdec_int] )
-			res.type_map = YugabyteYSQL::TypeMapByColumn.new [textdec_float]
+			res.type_map = YSQL::TypeMapByColumn.new [textdec_float]
 			expect( res.type_map.coders ).to eq( [textdec_float] )
-			res.type_map = YugabyteYSQL::TypeMapAllStrings.new
-			expect( res.type_map ).to be_kind_of(YugabyteYSQL::TypeMapAllStrings)
+			res.type_map = YSQL::TypeMapAllStrings.new
+			expect( res.type_map ).to be_kind_of(YSQL::TypeMapAllStrings)
 		end
 
 		it "should be applied to all value retrieving methods" do
 			res = @conn.exec( "SELECT 123 as f" )
-			res.type_map = YugabyteYSQL::TypeMapByColumn.new [textdec_int]
+			res.type_map = YSQL::TypeMapByColumn.new [textdec_int]
 			expect( res.values ).to eq( [[123]] )
 			expect( res.getvalue(0,0) ).to eq( 123 )
 			expect( res[0] ).to eq( {'f' => 123 } )
@@ -778,7 +778,7 @@ describe YugabyteYSQL::Result do
 		end
 
 		it "should be usable for several queries" do
-			colmap = YugabyteYSQL::TypeMapByColumn.new [textdec_int]
+			colmap = YSQL::TypeMapByColumn.new [textdec_int]
 			res = @conn.exec( "SELECT 123" )
 			res.type_map = colmap
 			expect( res.values ).to eq( [[123]] )

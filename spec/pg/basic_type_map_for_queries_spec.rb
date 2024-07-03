@@ -3,18 +3,18 @@
 
 require_relative '../helpers'
 
-require 'yugabyte_ysql'
+require 'ysql'
 require 'time'
 
 describe 'Basic type mapping' do
 
-	describe YugabyteYSQL::BasicTypeMapForQueries do
+	describe YSQL::BasicTypeMapForQueries do
 		let!(:basic_type_mapping) do
-			YugabyteYSQL::BasicTypeMapForQueries.new(@conn).freeze
+			YSQL::BasicTypeMapForQueries.new(@conn).freeze
 		end
 
 		let!(:basic_type_mapping_writable) do
-			YugabyteYSQL::BasicTypeMapForQueries.new(@conn)
+			YSQL::BasicTypeMapForQueries.new(@conn)
 		end
 
 		it "should be shareable for Ractor", :ractor do
@@ -23,8 +23,8 @@ describe 'Basic type mapping' do
 
 		it "should be usable with Ractor", :ractor do
 			vals = Ractor.new(@conninfo) do |conninfo|
-				conn = YugabyteYSQL.connect(conninfo)
-				conn.type_map_for_queries = YugabyteYSQL::BasicTypeMapForQueries.new(conn)
+				conn = YSQL.connect(conninfo)
+				conn.type_map_for_queries = YSQL::BasicTypeMapForQueries.new(conn)
 				res = conn.exec_params( "SELECT $1 AT TIME ZONE '-02', $2",
 					[Time.new(2019, 12, 8, 20, 38, 12.123, "-01:00"), true])
 				res.values
@@ -36,32 +36,32 @@ describe 'Basic type mapping' do
 		end
 
 		it "can be initialized with a CoderMapsBundle instead of a connection" do
-			maps = YugabyteYSQL::BasicTypeRegistry::CoderMapsBundle.new(@conn).freeze
-			tm = YugabyteYSQL::BasicTypeMapForQueries.new(maps)
-			expect( tm[Integer] ).to be_kind_of(YugabyteYSQL::TextEncoder::Integer)
+			maps = YSQL::BasicTypeRegistry::CoderMapsBundle.new(@conn).freeze
+			tm = YSQL::BasicTypeMapForQueries.new(maps)
+			expect( tm[Integer] ).to be_kind_of(YSQL::TextEncoder::Integer)
 		end
 
 		it "can be initialized with a custom type registry" do
-			regi = YugabyteYSQL::BasicTypeRegistry.new
-			regi.register_type 0, 'int8', YugabyteYSQL::BinaryEncoder::Int8, nil
-			tm = YugabyteYSQL::BasicTypeMapForQueries.new(@conn, registry: regi, if_undefined: proc{}).freeze
+			regi = YSQL::BasicTypeRegistry.new
+			regi.register_type 0, 'int8', YSQL::BinaryEncoder::Int8, nil
+			tm = YSQL::BasicTypeMapForQueries.new(@conn, registry: regi, if_undefined: proc{}).freeze
 			res = @conn.exec_params( "SELECT $1::text", [0x3031323334353637], 0, tm )
 			expect( res.values ).to eq( [["01234567"]] )
 		end
 
 		it "can take a Proc and nitify about undefined types" do
-			regi = YugabyteYSQL::BasicTypeRegistry.new.freeze
+			regi = YSQL::BasicTypeRegistry.new.freeze
 			args = []
 			pr = proc { |*a| args << a }
-			YugabyteYSQL::BasicTypeMapForQueries.new(@conn, registry: regi, if_undefined: pr)
+			YSQL::BasicTypeMapForQueries.new(@conn, registry: regi, if_undefined: pr)
 			expect( args.first ).to eq( ["bool", 1] )
 		end
 
 		it "raises UndefinedEncoder for undefined types" do
-			regi = YugabyteYSQL::BasicTypeRegistry.new.freeze
+			regi = YSQL::BasicTypeRegistry.new.freeze
 			expect do
-				YugabyteYSQL::BasicTypeMapForQueries.new(@conn, registry: regi, if_undefined: nil)
-			end.to raise_error(YugabyteYSQL::BasicTypeMapForQueries::UndefinedEncoder)
+				YSQL::BasicTypeMapForQueries.new(@conn, registry: regi, if_undefined: nil)
+			end.to raise_error(YSQL::BasicTypeMapForQueries::UndefinedEncoder)
 		end
 
 		it "should be shareable for Ractor", :ractor do
@@ -258,7 +258,7 @@ describe 'Basic type mapping' do
 
 		it "should take BinaryData for bytea columns" do
 			@conn.exec("CREATE TEMP TABLE IF NOT EXISTS bytea_test (data bytea)")
-			bd = YugabyteYSQL::BasicTypeMapForQueries::BinaryData.new("ab\xff\0cd").freeze
+			bd = YSQL::BasicTypeMapForQueries::BinaryData.new("ab\xff\0cd").freeze
 			res = @conn.exec_params("INSERT INTO bytea_test (data) VALUES ($1) RETURNING data", [bd], nil, basic_type_mapping)
 
 			expect( res.to_a ).to eq([{"data" => "\\x6162ff006364"}])
