@@ -41,7 +41,7 @@ FOR EACH STATEMENT
 EXECUTE PROCEDURE notify_test();
 }
 
-conn = YugabyteYSQL.connect(:dbname => 'test' )
+conn = YSQL.connect(:dbname => 'test' )
 
 conn.exec( TRIGGER_TABLE )
 conn.exec( TRIGGER_FUNCTION )

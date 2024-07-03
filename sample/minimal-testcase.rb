@@ -2,12 +2,12 @@
 
 require 'ysql'
 
-conn = YugabyteYSQL.connect(:dbname => 'test' )
+conn = YSQL.connect(:dbname => 'test' )
 $stderr.puts '---',
              RUBY_DESCRIPTION,
-             YugabyteYSQL.version_string(true ),
+             YSQL.version_string(true ),
              "Server version: #{conn.server_version}",
-             "Client version: #{YugabyteYSQL.library_version}",
+             "Client version: #{YSQL.library_version}",
              '---'
 
 result = conn.exec( "SELECT * from pg_stat_activity" )

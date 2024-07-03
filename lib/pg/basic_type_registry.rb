@@ -1,7 +1,7 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-require 'ysql' unless defined?( YugabyteYSQL )
+require 'ysql' unless defined?( YSQL )
 
 # This class defines the mapping between PostgreSQL types and encoder/decoder classes for PG::BasicTypeMapForResults, PG::BasicTypeMapForQueries and PG::BasicTypeMapBasedOnResult.
 #
@@ -25,7 +25,7 @@ require 'ysql' unless defined?( YugabyteYSQL )
 #   regi = PG::BasicTypeRegistry.new.register_default_types
 #   regi.register_type(0, 'inet', InetEncoder, InetDecoder)
 #   conn.type_map_for_results = PG::BasicTypeMapForResults.new(conn, registry: regi)
-class YugabyteYSQL::BasicTypeRegistry
+class YSQL::BasicTypeRegistry
 	# An instance of this class stores the coders that should be used for a particular wire format (text or binary)
 	# and type cast direction (encoder or decoder).
 	#
@@ -125,8 +125,8 @@ class YugabyteYSQL::BasicTypeRegistry
 
 		private def init_maps(registry, result)
 			@maps = [
-				[0, :encoder, YugabyteYSQL::TextEncoder::Array],
-				[0, :decoder, YugabyteYSQL::TextDecoder::Array],
+				[0, :encoder, YSQL::TextEncoder::Array],
+				[0, :decoder, YSQL::TextDecoder::Array],
 				[1, :encoder, nil],
 				[1, :decoder, nil],
 			].inject([]) do |h, (format, direction, arraycoder)|
@@ -159,11 +159,11 @@ class YugabyteYSQL::BasicTypeRegistry
 		end
 
 		protected def build_coder_maps(conn_or_maps, registry: nil)
-			if conn_or_maps.is_a?(YugabyteYSQL::BasicTypeRegistry::CoderMapsBundle)
+			if conn_or_maps.is_a?(YSQL::BasicTypeRegistry::CoderMapsBundle)
 				raise ArgumentError, "registry argument must be given to CoderMapsBundle" if registry
 				conn_or_maps
 			else
-				YugabyteYSQL::BasicTypeRegistry::CoderMapsBundle.new(conn_or_maps, registry: registry).freeze
+				YSQL::BasicTypeRegistry::CoderMapsBundle.new(conn_or_maps, registry: registry).freeze
 			end
 		end
 	end
@@ -220,17 +220,17 @@ class YugabyteYSQL::BasicTypeRegistry
 
 	# Populate the registry with all builtin types of ruby-pg
 	def register_default_types
-		register_type 0, 'int2', YugabyteYSQL::TextEncoder::Integer, YugabyteYSQL::TextDecoder::Integer
+		register_type 0, 'int2', YSQL::TextEncoder::Integer, YSQL::TextDecoder::Integer
 		alias_type    0, 'int4', 'int2'
 		alias_type    0, 'int8', 'int2'
 		alias_type    0, 'oid',  'int2'
 
 		begin
 			require "bigdecimal"
-			register_type 0, 'numeric', YugabyteYSQL::TextEncoder::Numeric, YugabyteYSQL::TextDecoder::Numeric
+			register_type 0, 'numeric', YSQL::TextEncoder::Numeric, YSQL::TextDecoder::Numeric
 		rescue LoadError
 		end
-		register_type 0, 'text', YugabyteYSQL::TextEncoder::String, YugabyteYSQL::TextDecoder::String
+		register_type 0, 'text', YSQL::TextEncoder::String, YSQL::TextDecoder::String
 		alias_type 0, 'varchar', 'text'
 		alias_type 0, 'char', 'text'
 		alias_type 0, 'bpchar', 'text'
@@ -244,18 +244,18 @@ class YugabyteYSQL::BasicTypeRegistry
 		# alias_type 'uuid',     'text'
 		#
 		# register_type 'money', OID::Money.new
-		register_type 0, 'bytea', YugabyteYSQL::TextEncoder::Bytea, YugabyteYSQL::TextDecoder::Bytea
-		register_type 0, 'bool', YugabyteYSQL::TextEncoder::Boolean, YugabyteYSQL::TextDecoder::Boolean
+		register_type 0, 'bytea', YSQL::TextEncoder::Bytea, YSQL::TextDecoder::Bytea
+		register_type 0, 'bool', YSQL::TextEncoder::Boolean, YSQL::TextDecoder::Boolean
 		# register_type 'bit', OID::Bit.new
 		# register_type 'varbit', OID::Bit.new
 
-		register_type 0, 'float4', YugabyteYSQL::TextEncoder::Float, YugabyteYSQL::TextDecoder::Float
+		register_type 0, 'float4', YSQL::TextEncoder::Float, YSQL::TextDecoder::Float
 		alias_type 0, 'float8', 'float4'
 
 		# For compatibility reason the timestamp in text format is encoded as local time (TimestampWithoutTimeZone) instead of UTC
-		register_type 0, 'timestamp', YugabyteYSQL::TextEncoder::TimestampWithoutTimeZone, YugabyteYSQL::TextDecoder::TimestampWithoutTimeZone
-		register_type 0, 'timestamptz', YugabyteYSQL::TextEncoder::TimestampWithTimeZone, YugabyteYSQL::TextDecoder::TimestampWithTimeZone
-		register_type 0, 'date', YugabyteYSQL::TextEncoder::Date, YugabyteYSQL::TextDecoder::Date
+		register_type 0, 'timestamp', YSQL::TextEncoder::TimestampWithoutTimeZone, YSQL::TextDecoder::TimestampWithoutTimeZone
+		register_type 0, 'timestamptz', YSQL::TextEncoder::TimestampWithTimeZone, YSQL::TextDecoder::TimestampWithTimeZone
+		register_type 0, 'date', YSQL::TextEncoder::Date, YSQL::TextDecoder::Date
 		# register_type 'time', OID::Time.new
 		#
 		# register_type 'path', OID::Text.new
@@ -263,41 +263,41 @@ class YugabyteYSQL::BasicTypeRegistry
 		# register_type 'polygon', OID::Text.new
 		# register_type 'circle', OID::Text.new
 		# register_type 'hstore', OID::Hstore.new
-		register_type 0, 'json', YugabyteYSQL::TextEncoder::JSON, YugabyteYSQL::TextDecoder::JSON
+		register_type 0, 'json', YSQL::TextEncoder::JSON, YSQL::TextDecoder::JSON
 		alias_type    0, 'jsonb',  'json'
 		# register_type 'citext', OID::Text.new
 		# register_type 'ltree', OID::Text.new
 		#
-		register_type 0, 'inet', YugabyteYSQL::TextEncoder::Inet, YugabyteYSQL::TextDecoder::Inet
+		register_type 0, 'inet', YSQL::TextEncoder::Inet, YSQL::TextDecoder::Inet
 		alias_type 0, 'cidr', 'inet'
 
 
 
-		register_type 1, 'int2', YugabyteYSQL::BinaryEncoder::Int2, YugabyteYSQL::BinaryDecoder::Integer
-		register_type 1, 'int4', YugabyteYSQL::BinaryEncoder::Int4, YugabyteYSQL::BinaryDecoder::Integer
-		register_type 1, 'int8', YugabyteYSQL::BinaryEncoder::Int8, YugabyteYSQL::BinaryDecoder::Integer
+		register_type 1, 'int2', YSQL::BinaryEncoder::Int2, YSQL::BinaryDecoder::Integer
+		register_type 1, 'int4', YSQL::BinaryEncoder::Int4, YSQL::BinaryDecoder::Integer
+		register_type 1, 'int8', YSQL::BinaryEncoder::Int8, YSQL::BinaryDecoder::Integer
 		alias_type    1, 'oid',  'int2'
 
-		register_type 1, 'text', YugabyteYSQL::BinaryEncoder::String, YugabyteYSQL::BinaryDecoder::String
+		register_type 1, 'text', YSQL::BinaryEncoder::String, YSQL::BinaryDecoder::String
 		alias_type 1, 'varchar', 'text'
 		alias_type 1, 'char', 'text'
 		alias_type 1, 'bpchar', 'text'
 		alias_type 1, 'xml', 'text'
 		alias_type 1, 'name', 'text'
 
-		register_type 1, 'bytea', YugabyteYSQL::BinaryEncoder::Bytea, YugabyteYSQL::BinaryDecoder::Bytea
-		register_type 1, 'bool', YugabyteYSQL::BinaryEncoder::Boolean, YugabyteYSQL::BinaryDecoder::Boolean
-		register_type 1, 'float4', YugabyteYSQL::BinaryEncoder::Float4, YugabyteYSQL::BinaryDecoder::Float
-		register_type 1, 'float8', YugabyteYSQL::BinaryEncoder::Float8, YugabyteYSQL::BinaryDecoder::Float
-		register_type 1, 'timestamp', YugabyteYSQL::BinaryEncoder::TimestampUtc, YugabyteYSQL::BinaryDecoder::TimestampUtc
-		register_type 1, 'timestamptz', YugabyteYSQL::BinaryEncoder::TimestampUtc, YugabyteYSQL::BinaryDecoder::TimestampUtcToLocal
-		register_type 1, 'date', YugabyteYSQL::BinaryEncoder::Date, YugabyteYSQL::BinaryDecoder::Date
+		register_type 1, 'bytea', YSQL::BinaryEncoder::Bytea, YSQL::BinaryDecoder::Bytea
+		register_type 1, 'bool', YSQL::BinaryEncoder::Boolean, YSQL::BinaryDecoder::Boolean
+		register_type 1, 'float4', YSQL::BinaryEncoder::Float4, YSQL::BinaryDecoder::Float
+		register_type 1, 'float8', YSQL::BinaryEncoder::Float8, YSQL::BinaryDecoder::Float
+		register_type 1, 'timestamp', YSQL::BinaryEncoder::TimestampUtc, YSQL::BinaryDecoder::TimestampUtc
+		register_type 1, 'timestamptz', YSQL::BinaryEncoder::TimestampUtc, YSQL::BinaryDecoder::TimestampUtcToLocal
+		register_type 1, 'date', YSQL::BinaryEncoder::Date, YSQL::BinaryDecoder::Date
 
 		self
 	end
 
 	alias define_default_types register_default_types
 
-	DEFAULT_TYPE_REGISTRY = YugabyteYSQL.make_shareable(YugabyteYSQL::BasicTypeRegistry.new.register_default_types)
+	DEFAULT_TYPE_REGISTRY = YSQL.make_shareable(YSQL::BasicTypeRegistry.new.register_default_types)
 	private_constant :DEFAULT_TYPE_REGISTRY
 end

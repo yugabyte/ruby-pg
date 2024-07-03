@@ -6,21 +6,21 @@ require_relative '../helpers'
 require 'time'
 
 describe 'Basic type mapping' do
-	describe YugabyteYSQL::BasicTypeMapForResults do
+	describe YSQL::BasicTypeMapForResults do
 		let!(:basic_type_mapping) do
-			YugabyteYSQL::BasicTypeMapForResults.new(@conn).freeze
+			YSQL::BasicTypeMapForResults.new(@conn).freeze
 		end
 
 		it "can be initialized with a CoderMapsBundle instead of a connection" do
-			maps = YugabyteYSQL::BasicTypeRegistry::CoderMapsBundle.new(@conn).freeze
-			tm = YugabyteYSQL::BasicTypeMapForResults.new(maps)
-			expect( tm.rm_coder(0, 16) ).to be_kind_of(YugabyteYSQL::TextDecoder::Boolean)
+			maps = YSQL::BasicTypeRegistry::CoderMapsBundle.new(@conn).freeze
+			tm = YSQL::BasicTypeMapForResults.new(maps)
+			expect( tm.rm_coder(0, 16) ).to be_kind_of(YSQL::TextDecoder::Boolean)
 		end
 
 		it "can be initialized with a custom type registry" do
-			regi = YugabyteYSQL::BasicTypeRegistry.new
-			regi.register_type 1, 'int4', nil, YugabyteYSQL::BinaryDecoder::Integer
-			tm = YugabyteYSQL::BasicTypeMapForResults.new(@conn, registry: regi).freeze
+			regi = YSQL::BasicTypeRegistry.new
+			regi.register_type 1, 'int4', nil, YSQL::BinaryDecoder::Integer
+			tm = YSQL::BasicTypeMapForResults.new(@conn, registry: regi).freeze
 			res = @conn.exec_params( "SELECT '2021-08-03'::DATE, 234", [], 1 ).map_types!(tm)
 			expect{ res.values }.to output(/no type cast defined for type "date" format 1 /).to_stderr
 			expect( res.values ).to eq( [["\x00\x00\x1E\xCD".b, 234]] )
@@ -32,7 +32,7 @@ describe 'Basic type mapping' do
 
 		it "should be usable with Ractor and shared type map", :ractor do
 			vals = Ractor.new(@conninfo, Ractor.make_shareable(basic_type_mapping)) do |conninfo, btm|
-				conn = YugabyteYSQL.connect(conninfo)
+				conn = YSQL.connect(conninfo)
 				res = conn.exec( "SELECT 1, 'a', 2.0::FLOAT, TRUE, '2013-06-30'::DATE" )
 				res.map_types!(btm).values
 			ensure
@@ -46,9 +46,9 @@ describe 'Basic type mapping' do
 
 		it "should be usable with Ractor", :ractor do
 			vals = Ractor.new(@conninfo) do |conninfo|
-				conn = YugabyteYSQL.connect(conninfo)
+				conn = YSQL.connect(conninfo)
 				res = conn.exec( "SELECT 1, 'a', 2.0::FLOAT, TRUE, '2013-06-30'::DATE" )
-				btm = YugabyteYSQL::BasicTypeMapForResults.new(conn)
+				btm = YSQL::BasicTypeMapForResults.new(conn)
 				res.map_types!(btm).values
 			ensure
 				conn&.finish
@@ -73,8 +73,8 @@ describe 'Basic type mapping' do
 
 		[1, 0].each do |format|
 			it "should warn about undefined types in format #{format}" do
-				regi = YugabyteYSQL::BasicTypeRegistry.new.freeze
-				tm = YugabyteYSQL::BasicTypeMapForResults.new(@conn, registry: regi).freeze
+				regi = YSQL::BasicTypeRegistry.new.freeze
+				tm = YSQL::BasicTypeMapForResults.new(@conn, registry: regi).freeze
 				res = @conn.exec_params( "SELECT 1.23", [], format ).map_types!(tm)
 				expect{ res.values }.to output(/type "numeric".*format #{format}.*oid 1700/).to_stderr
 			end
@@ -90,7 +90,7 @@ describe 'Basic type mapping' do
 			end
 
 			after :each do
-				@conn.type_map_for_results = YugabyteYSQL::TypeMapAllStrings.new.freeze
+				@conn.type_map_for_results = YSQL::TypeMapAllStrings.new.freeze
 			end
 
 			it "should do boolean type conversions" do
@@ -163,9 +163,9 @@ describe 'Basic type mapping' do
 
 			[1, 0].each do |format|
 				it "should convert format #{format} timestamps per TimestampUtc" do
-					regi = YugabyteYSQL::BasicTypeRegistry.new.register_default_types
-					regi.register_type 0, 'timestamp', nil, YugabyteYSQL::TextDecoder::TimestampUtc
-					@conn.type_map_for_results = YugabyteYSQL::BasicTypeMapForResults.new(@conn, registry: regi)
+					regi = YSQL::BasicTypeRegistry.new.register_default_types
+					regi.register_type 0, 'timestamp', nil, YSQL::TextDecoder::TimestampUtc
+					@conn.type_map_for_results = YSQL::BasicTypeMapForResults.new(@conn, registry: regi)
 					res = @conn.exec_params( "SELECT CAST('2013-07-31 23:58:59+02' AS TIMESTAMP WITHOUT TIME ZONE),
 																		CAST('1913-12-31 23:58:59.1231-03' AS TIMESTAMP WITHOUT TIME ZONE),
 																		CAST('4714-11-24 23:58:59.1231-03 BC' AS TIMESTAMP WITHOUT TIME ZONE),
@@ -183,10 +183,10 @@ describe 'Basic type mapping' do
 
 			[1, 0].each do |format|
 				it "should convert format #{format} timestamps per TimestampUtcToLocal" do
-					regi = YugabyteYSQL::BasicTypeRegistry.new
-					regi.register_type 0, 'timestamp', nil, YugabyteYSQL::TextDecoder::TimestampUtcToLocal
-					regi.register_type 1, 'timestamp', nil, YugabyteYSQL::BinaryDecoder::TimestampUtcToLocal
-					@conn.type_map_for_results = YugabyteYSQL::BasicTypeMapForResults.new(@conn, registry: regi)
+					regi = YSQL::BasicTypeRegistry.new
+					regi.register_type 0, 'timestamp', nil, YSQL::TextDecoder::TimestampUtcToLocal
+					regi.register_type 1, 'timestamp', nil, YSQL::BinaryDecoder::TimestampUtcToLocal
+					@conn.type_map_for_results = YSQL::BasicTypeMapForResults.new(@conn, registry: regi)
 					res = @conn.exec_params( "SELECT CAST('2013-07-31 23:58:59+02' AS TIMESTAMP WITHOUT TIME ZONE),
 																		CAST('1913-12-31 23:58:59.1231-03' AS TIMESTAMP WITHOUT TIME ZONE),
 																		CAST('4714-11-24 23:58:59.1231-03 BC' AS TIMESTAMP WITHOUT TIME ZONE),
@@ -204,10 +204,10 @@ describe 'Basic type mapping' do
 
 			[1, 0].each do |format|
 				it "should convert format #{format} timestamps per TimestampLocal" do
-					regi = YugabyteYSQL::BasicTypeRegistry.new
-					regi.register_type 0, 'timestamp', nil, YugabyteYSQL::TextDecoder::TimestampLocal
-					regi.register_type 1, 'timestamp', nil, YugabyteYSQL::BinaryDecoder::TimestampLocal
-					@conn.type_map_for_results = YugabyteYSQL::BasicTypeMapForResults.new(@conn, registry: regi)
+					regi = YSQL::BasicTypeRegistry.new
+					regi.register_type 0, 'timestamp', nil, YSQL::TextDecoder::TimestampLocal
+					regi.register_type 1, 'timestamp', nil, YSQL::BinaryDecoder::TimestampLocal
+					@conn.type_map_for_results = YSQL::BasicTypeMapForResults.new(@conn, registry: regi)
 					res = @conn.exec_params( "SELECT CAST('2013-07-31 23:58:59' AS TIMESTAMP WITHOUT TIME ZONE),
 																		CAST('1913-12-31 23:58:59.1231' AS TIMESTAMP WITHOUT TIME ZONE),
 																		CAST('4714-11-24 23:58:59.1231-03 BC' AS TIMESTAMP WITHOUT TIME ZONE),
@@ -394,7 +394,7 @@ describe 'Basic type mapping' do
 				# Retrieve table OIDs per empty result.
 				res = @conn.exec( "SELECT * FROM copytable LIMIT 0" )
 				tm = basic_type_mapping.build_column_map( res )
-				row_decoder = YugabyteYSQL::TextDecoder::CopyRow.new(type_map: tm).freeze
+				row_decoder = YSQL::TextDecoder::CopyRow.new(type_map: tm).freeze
 
 				rows = []
 				@conn.copy_data( "COPY copytable TO STDOUT", row_decoder ) do |res|
@@ -412,7 +412,7 @@ describe 'Basic type mapping' do
 				# Retrieve table OIDs per empty result.
 				res = @conn.exec_params( "SELECT * FROM copytable LIMIT 0", [], 1 )
 				tm = basic_type_mapping.build_column_map( res )
-				row_decoder = YugabyteYSQL::BinaryDecoder::CopyRow.new(type_map: tm).freeze
+				row_decoder = YSQL::BinaryDecoder::CopyRow.new(type_map: tm).freeze
 
 				rows = []
 				@conn.copy_data( "COPY copytable TO STDOUT WITH (FORMAT binary)", row_decoder ) do |res|

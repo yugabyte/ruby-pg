@@ -1,7 +1,7 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-module YugabyteYSQL
+module YSQL
 	module BinaryDecoder
 		# Init C part of the decoder
 		init_date

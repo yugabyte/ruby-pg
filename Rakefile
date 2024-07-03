@@ -89,7 +89,7 @@ task :gem => :build
 task :clobber do
 	puts "Stop any Postmaster instances that remain after testing."
 	require_relative 'spec/helpers'
-	YugabyteYSQL::TestingHelpers.stop_existing_postmasters()
+	YSQL::TestingHelpers.stop_existing_postmasters()
 end
 
 desc "Update list of server error codes"

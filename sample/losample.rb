@@ -5,7 +5,7 @@ require 'ysql'
 SAMPLE_WRITE_DATA = 'some sample data'
 SAMPLE_EXPORT_NAME = 'lowrite.txt'
 
-conn = YugabyteYSQL.connect(:dbname => 'test', :host => 'localhost', :port => 5432 )
+conn = YSQL.connect(:dbname => 'test', :host => 'localhost', :port => 5432 )
 puts "dbname: " + conn.db + "\thost: " + conn.host + "\tuser: " + conn.user
 
 # Start a transaction, as all large object functions require one.
@@ -20,15 +20,15 @@ puts "  imported as large object %d" % [ oid ]
 
 # Read back 50 bytes of the imported data
 puts "Read test:"
-fd = conn.lo_open(oid, YugabyteYSQL::INV_READ|YugabyteYSQL::INV_WRITE )
-conn.lo_lseek(fd, 0, YugabyteYSQL::SEEK_SET )
+fd = conn.lo_open(oid, YSQL::INV_READ|YSQL::INV_WRITE )
+conn.lo_lseek(fd, 0, YSQL::SEEK_SET )
 buf = conn.lo_read( fd, 50 )
 puts "  read: %p" % [ buf ]
 puts "  read was ok!" if buf =~ /require 'pg'/
 
 # Append some test data onto the end of the object
 puts "Write test:"
-conn.lo_lseek(fd, 0, YugabyteYSQL::SEEK_END )
+conn.lo_lseek(fd, 0, YSQL::SEEK_END )
 buf = SAMPLE_WRITE_DATA.dup
 totalbytes = 0
 until buf.empty?
@@ -53,9 +53,9 @@ puts 'Testing read and delete from a new transaction:'
 puts '  starting a new transaction'
 conn.exec( 'BEGIN' )
 
-fd = conn.lo_open(oid, YugabyteYSQL::INV_READ )
+fd = conn.lo_open(oid, YSQL::INV_READ )
 puts '  reopened okay.'
-conn.lo_lseek(fd, 50, YugabyteYSQL::SEEK_END )
+conn.lo_lseek(fd, 50, YSQL::SEEK_END )
 buf = conn.lo_read( fd, 50 )
 puts '  read okay.' if buf == SAMPLE_WRITE_DATA
 

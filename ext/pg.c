@@ -346,7 +346,7 @@ Init_pg_ext(void)
 		pg_skip_deprecation_warning = 0;
 	}
 
-	rb_mPG = rb_define_module( "YugabyteYSQL" );
+	rb_mPG = rb_define_module( "YSQL" );
 	rb_mPGconstants = rb_define_module_under( rb_mPG, "Constants" );
 
 	/*************************

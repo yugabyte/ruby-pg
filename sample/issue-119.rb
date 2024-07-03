@@ -9,14 +9,14 @@ require 'ysql'
 #  https://bitbucket.org/ged/ruby-pg/issue/119
 #
 
-conn		   = YugabyteYSQL.connect(dbname: 'test' )
+conn		   = YSQL.connect(dbname: 'test' )
 table_name	   = 'issue_119'
 field_list	   = %w[name body_weight brain_weight]
 method		   = 0
 options		   = { truncate: true }
 sql_parameters = ''
 
-conn.set_error_verbosity(YugabyteYSQL::PQERRORS_VERBOSE )
+conn.set_error_verbosity(YSQL::PQERRORS_VERBOSE )
 conn.exec( "DROP TABLE IF EXISTS #{table_name}" )
 conn.exec( "CREATE TABLE #{table_name} ( id SERIAL, name TEXT, body_weight REAL, brain_weight REAL )" )
 
@@ -79,7 +79,7 @@ END_DATA
 		while res = rc.get_result
 			st = res.res_status( res.result_status )
 			puts "Result of COPY is: %s" % [ st ]
-			if res.result_status != YugabyteYSQL::PGRES_COPY_IN
+			if res.result_status != YSQL::PGRES_COPY_IN
 				puts res.error_message
 			end
 		end

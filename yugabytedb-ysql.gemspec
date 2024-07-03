@@ -5,11 +5,11 @@ require_relative 'lib/pg/version'
 
 Gem::Specification.new do |spec|
   spec.name          = "yugabytedb-ysql"
-  spec.version       = YugabyteYSQL::VERSION
+  spec.version       = YSQL::VERSION
   spec.authors       = ["Michael Granger", "Lars Kanis", "YugabyteDB Dev Team"]
   spec.email         = ["ged@FaerieMUD.org", "lars@greiz-reinsdorf.de", "info@yugabyte.com"]
 
-  spec.summary       = "The Ruby interface to YugabyteDB, based on PG Ruby Driver v#{YugabyteYSQL::PG_VERSION}"
+  spec.summary       = "The Ruby interface to YugabyteDB, based on PG Ruby Driver v#{YSQL::PG_VERSION}"
   spec.description   = "Pg_YugabyteDB is the Ruby interface to the PostgreSQL-compatible YugabyteDB. It works with YugabyteDB 2.20 and later."
   spec.homepage      = "https://github.com/yugabyte/ruby-pg"
   spec.license       = "BSD-2-Clause"
@@ -28,6 +28,6 @@ Gem::Specification.new do |spec|
   spec.extensions    = ["ext/extconf.rb"]
   spec.require_paths = ["lib"]
   spec.rdoc_options  = ["--main", "README.md",
-                        "--title", "YugabyteYSQL: The Ruby Driver for YugabyteDB (YSQL)"]
+                        "--title", "YSQL: The Ruby Driver for YugabyteDB (YSQL)"]
   spec.extra_rdoc_files = `git ls-files -z *.rdoc *.md lib/*.rb lib/*/*.rb lib/*/*/*.rb ext/*.c ext/*.h`.split("\x0")
 end

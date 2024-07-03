@@ -6,7 +6,7 @@ require 'ysql'
 # the cursor portion of testlibpq.c from src/test/examples.
 
 $stderr.puts "Opening database connection ..."
-conn = YugabyteYSQL.connect(:dbname => 'test' )
+conn = YSQL.connect(:dbname => 'test' )
 
 #
 conn.transaction do

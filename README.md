@@ -39,7 +39,7 @@ gem install yugabytedb-ysql -- --with-pg-config=<yugabyte-install-dir>/postgres/
     require 'ysql'
     ...
     yburl = "postgresql://yugabyte:yugabyte@127.0.0.1:5433/yugabyte?load_balance=true"
-    connection = YugabyteYSQL.connect(url)
+    connection = YSQL.connect(url)
     ...
     ```
 
@@ -49,14 +49,14 @@ gem install yugabytedb-ysql -- --with-pg-config=<yugabyte-install-dir>/postgres/
     require 'ysql'
     ...
     yburl = "postgresql://yugabyte:yugabyte@127.0.0.1:5433/yugabyte?load_balance=true&topology_keys=cloud.regionA.zoneA,cloud.regionA.zoneB"
-    connection = YugabyteYSQL.connect(url)
+    connection = YSQL.connect(url)
     ...
     ```
 
   Alternatively, you could also specify the properties as key, value pairs as shown below.
 
     ```
-    connection = YugabyteYSQL.connect(host: 'localhost', port: '5433', dbname: 'yugabyte',
+    connection = YSQL.connect(host: 'localhost', port: '5433', dbname: 'yugabyte',
                                       user: 'yugabyte', password: 'yugabyte',
                                       load_balance: 'true', yb_servers_refresh_interval: '10')
     ```
@@ -114,7 +114,7 @@ A small example usage:
 require 'pg'
 
 # Output a table of current connections to the DB
-conn = YugabyteYSQL.connect(dbname: 'sales')
+conn = YSQL.connect(dbname: 'sales')
 conn.exec("SELECT * FROM pg_stat_activity") do |result|
   puts "     PID | User             | Query"
   result.each do |row|
@@ -189,12 +189,12 @@ can be omitted.
 Very basic type casting can be enabled by:
 
 ```ruby
-    conn.type_map_for_results = YugabyteYSQL::BasicTypeMapForResults.new conn
+    conn.type_map_for_results = YSQL::BasicTypeMapForResults.new conn
 # ... this works for result value mapping:
 conn.exec("select 1, now(), '{2,3}'::int[]").values
 # => [[1, 2014-09-21 20:51:56 +0200, [2, 3]]]
 
-conn.type_map_for_queries = YugabyteYSQL::BasicTypeMapForQueries.new conn
+conn.type_map_for_queries = YSQL::BasicTypeMapForQueries.new conn
 # ... and this for param value mapping:
 conn.exec_params("SELECT $1::text, $2::text, $3::text", [1, 1.23, [2, 3]]).values
 # => [["1", "1.2300000000000000E+00", "{2,3}"]]

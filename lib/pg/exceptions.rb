@@ -1,10 +1,10 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-require 'ysql' unless defined?( YugabyteYSQL )
+require 'ysql' unless defined?( YSQL )
 
 
-module YugabyteYSQL
+module YSQL
 
 	class Error < StandardError
 		def initialize(msg=nil, connection: nil, result: nil)
@@ -14,11 +14,11 @@ module YugabyteYSQL
 		end
 	end
 
-	class NotAllCopyDataRetrieved < YugabyteYSQL::Error
+	class NotAllCopyDataRetrieved < YSQL::Error
 	end
-	class LostCopyState < YugabyteYSQL::Error
+	class LostCopyState < YSQL::Error
 	end
-	class NotInBlockingMode < YugabyteYSQL::Error
+	class NotInBlockingMode < YSQL::Error
 	end
 
 end # module PG

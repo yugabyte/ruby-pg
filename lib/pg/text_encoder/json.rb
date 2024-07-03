@@ -3,7 +3,7 @@
 
 require 'json'
 
-module YugabyteYSQL
+module YSQL
 	module TextEncoder
 		class JSON < SimpleEncoder
 			def encode(value)

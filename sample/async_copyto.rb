@@ -6,7 +6,7 @@ require 'stringio'
 # Using COPY asynchronously
 
 $stderr.puts "Opening database connection ..."
-conn = YugabyteYSQL.connect(:dbname => 'test' )
+conn = YSQL.connect(:dbname => 'test' )
 conn.setnonblocking( true )
 
 socket = conn.socket_io

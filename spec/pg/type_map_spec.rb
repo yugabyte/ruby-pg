@@ -6,8 +6,8 @@ require_relative '../helpers'
 require 'ysql'
 
 
-describe YugabyteYSQL::TypeMap do
-	let!(:tm){ YugabyteYSQL::TypeMap.new.freeze }
+describe YSQL::TypeMap do
+	let!(:tm){ YSQL::TypeMap.new.freeze }
 
 	it "should give account about memory usage" do
 		expect( ObjectSpace.memsize_of(tm) ).to be > DATA_OBJ_MEMSIZE

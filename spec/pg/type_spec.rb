@@ -6,46 +6,46 @@ require 'time'
 
 
 describe "PG::Type derivations" do
-	let!(:textenc_int) { YugabyteYSQL::TextEncoder::Integer.new name: 'Integer', oid: 23 }
-	let!(:textdec_int) { YugabyteYSQL::TextDecoder::Integer.new name: 'Integer', oid: 23 }
-	let!(:textenc_boolean) { YugabyteYSQL::TextEncoder::Boolean.new }
-	let!(:textdec_boolean) { YugabyteYSQL::TextDecoder::Boolean.new }
-	let!(:textenc_float) { YugabyteYSQL::TextEncoder::Float.new }
-	let!(:textdec_float) { YugabyteYSQL::TextDecoder::Float.new }
+	let!(:textenc_int) { YSQL::TextEncoder::Integer.new name: 'Integer', oid: 23 }
+	let!(:textdec_int) { YSQL::TextDecoder::Integer.new name: 'Integer', oid: 23 }
+	let!(:textenc_boolean) { YSQL::TextEncoder::Boolean.new }
+	let!(:textdec_boolean) { YSQL::TextDecoder::Boolean.new }
+	let!(:textenc_float) { YSQL::TextEncoder::Float.new }
+	let!(:textdec_float) { YSQL::TextDecoder::Float.new }
 	let!(:textenc_numeric) do
 		begin
-			YugabyteYSQL::TextEncoder::Numeric.new
+			YSQL::TextEncoder::Numeric.new
 		rescue LoadError
 		end
 	end
-	let!(:textenc_string) { YugabyteYSQL::TextEncoder::String.new }
-	let!(:textdec_string) { YugabyteYSQL::TextDecoder::String.new }
-	let!(:textenc_timestamp) { YugabyteYSQL::TextEncoder::TimestampWithoutTimeZone.new }
-	let!(:textdec_timestamp) { YugabyteYSQL::TextDecoder::TimestampWithoutTimeZone.new }
-	let!(:textenc_timestamputc) { YugabyteYSQL::TextEncoder::TimestampUtc.new }
-	let!(:textdec_timestamputc) { YugabyteYSQL::TextDecoder::TimestampUtc.new }
-	let!(:textdec_timestampul) { YugabyteYSQL::TextDecoder::TimestampUtcToLocal.new }
-	let!(:textenc_timestamptz) { YugabyteYSQL::TextEncoder::TimestampWithTimeZone.new }
-	let!(:textdec_timestamptz) { YugabyteYSQL::TextDecoder::TimestampWithTimeZone.new }
-	let!(:textenc_bytea) { YugabyteYSQL::TextEncoder::Bytea.new }
-	let!(:textdec_bytea) { YugabyteYSQL::TextDecoder::Bytea.new }
-	let!(:binaryenc_int2) { YugabyteYSQL::BinaryEncoder::Int2.new }
-	let!(:binaryenc_int4) { YugabyteYSQL::BinaryEncoder::Int4.new }
-	let!(:binaryenc_int8) { YugabyteYSQL::BinaryEncoder::Int8.new }
-	let!(:binarydec_string) { YugabyteYSQL::BinaryDecoder::String.new }
-	let!(:binarydec_integer) { YugabyteYSQL::BinaryDecoder::Integer.new }
-	let!(:binaryenc_timestamputc) { YugabyteYSQL::BinaryEncoder::TimestampUtc.new }
-	let!(:binaryenc_timestamplocal) { YugabyteYSQL::BinaryEncoder::TimestampLocal.new }
+	let!(:textenc_string) { YSQL::TextEncoder::String.new }
+	let!(:textdec_string) { YSQL::TextDecoder::String.new }
+	let!(:textenc_timestamp) { YSQL::TextEncoder::TimestampWithoutTimeZone.new }
+	let!(:textdec_timestamp) { YSQL::TextDecoder::TimestampWithoutTimeZone.new }
+	let!(:textenc_timestamputc) { YSQL::TextEncoder::TimestampUtc.new }
+	let!(:textdec_timestamputc) { YSQL::TextDecoder::TimestampUtc.new }
+	let!(:textdec_timestampul) { YSQL::TextDecoder::TimestampUtcToLocal.new }
+	let!(:textenc_timestamptz) { YSQL::TextEncoder::TimestampWithTimeZone.new }
+	let!(:textdec_timestamptz) { YSQL::TextDecoder::TimestampWithTimeZone.new }
+	let!(:textenc_bytea) { YSQL::TextEncoder::Bytea.new }
+	let!(:textdec_bytea) { YSQL::TextDecoder::Bytea.new }
+	let!(:binaryenc_int2) { YSQL::BinaryEncoder::Int2.new }
+	let!(:binaryenc_int4) { YSQL::BinaryEncoder::Int4.new }
+	let!(:binaryenc_int8) { YSQL::BinaryEncoder::Int8.new }
+	let!(:binarydec_string) { YSQL::BinaryDecoder::String.new }
+	let!(:binarydec_integer) { YSQL::BinaryDecoder::Integer.new }
+	let!(:binaryenc_timestamputc) { YSQL::BinaryEncoder::TimestampUtc.new }
+	let!(:binaryenc_timestamplocal) { YSQL::BinaryEncoder::TimestampLocal.new }
 
 	let!(:intenc_incrementer) do
-		Class.new(YugabyteYSQL::SimpleEncoder) do
+		Class.new(YSQL::SimpleEncoder) do
 			def encode(value)
 				(value.to_i + 1).to_s + " "
 			end
 		end.new
 	end
 	let!(:intdec_incrementer) do
-		Class.new(YugabyteYSQL::SimpleDecoder) do
+		Class.new(YSQL::SimpleDecoder) do
 			def decode(string, tuple=nil, field=nil)
 				string.to_i+1
 			end
@@ -53,7 +53,7 @@ describe "PG::Type derivations" do
 	end
 
 	let!(:intenc_incrementer_with_encoding) do
-		Class.new(YugabyteYSQL::SimpleEncoder) do
+		Class.new(YSQL::SimpleEncoder) do
 			def encode(value, encoding)
 				r = (value.to_i + 1).to_s + " #{encoding}"
 				r.encode!(encoding)
@@ -61,7 +61,7 @@ describe "PG::Type derivations" do
 		end.new
 	end
 	let!(:intenc_incrementer_with_int_result) do
-		Class.new(YugabyteYSQL::SimpleEncoder) do
+		Class.new(YSQL::SimpleEncoder) do
 			def encode(value)
 				value.to_i+1
 			end
@@ -69,10 +69,10 @@ describe "PG::Type derivations" do
 	end
 
 	it "shouldn't be possible to build a PG::Type directly" do
-		expect{ YugabyteYSQL::Coder.new }.to raise_error(TypeError, /cannot/)
+		expect{ YSQL::Coder.new }.to raise_error(TypeError, /cannot/)
 	end
 
-	describe YugabyteYSQL::SimpleCoder do
+	describe YSQL::SimpleCoder do
 		describe '#decode' do
 			it "should offer decode method with tuple/field" do
 				res = textdec_int.decode("123", 1, 1)
@@ -233,19 +233,19 @@ describe "PG::Type derivations" do
 
 			context 'identifier quotation' do
 				it 'should build an array out of an quoted identifier string' do
-					quoted_type = YugabyteYSQL::TextDecoder::Identifier.new
+					quoted_type = YSQL::TextDecoder::Identifier.new
 					expect( quoted_type.decode(%["A.".".B"]) ).to eq( ["A.", ".B"] )
 					expect( quoted_type.decode(%["'A"".""B'"]) ).to eq( ['\'A"."B\''] )
 				end
 
 				it 'should split unquoted identifier string' do
-					quoted_type = YugabyteYSQL::TextDecoder::Identifier.new
+					quoted_type = YSQL::TextDecoder::Identifier.new
 					expect( quoted_type.decode(%[a.b]) ).to eq( ['a','b'] )
 					expect( quoted_type.decode(%[a]) ).to eq( ['a'] )
 				end
 
 				it 'should split identifier string with correct character encoding' do
-					quoted_type = YugabyteYSQL::TextDecoder::Identifier.new
+					quoted_type = YSQL::TextDecoder::Identifier.new
 					v = quoted_type.decode(%[Héllo].encode("iso-8859-1")).first
 					expect( v.encoding ).to eq( Encoding::ISO_8859_1 )
 					expect( v ).to eq( %[Héllo].encode(Encoding::ISO_8859_1) )
@@ -427,7 +427,7 @@ describe "PG::Type derivations" do
 
 			context 'identifier quotation' do
 				it 'should quote and escape identifier' do
-					quoted_type = YugabyteYSQL::TextEncoder::Identifier.new
+					quoted_type = YSQL::TextEncoder::Identifier.new
 					expect( quoted_type.encode(['schema','table','col']) ).to eq( %["schema"."table"."col"] )
 					expect( quoted_type.encode(['A.','.B']) ).to eq( %["A.".".B"] )
 					expect( quoted_type.encode(%['A"."B']) ).to eq( %["'A"".""B'"] )
@@ -435,14 +435,14 @@ describe "PG::Type derivations" do
 				end
 
 				it 'should quote identifiers with correct character encoding' do
-					quoted_type = YugabyteYSQL::TextEncoder::Identifier.new
+					quoted_type = YSQL::TextEncoder::Identifier.new
 					v = quoted_type.encode(['Héllo'], "iso-8859-1")
 					expect( v ).to eq( %["Héllo"].encode(Encoding::ISO_8859_1) )
 					expect( v.encoding ).to eq( Encoding::ISO_8859_1 )
 				end
 
 				it "will raise a TypeError for invalid arguments to quote_ident" do
-					quoted_type = YugabyteYSQL::TextEncoder::Identifier.new
+					quoted_type = YSQL::TextEncoder::Identifier.new
 					expect{ quoted_type.encode( [nil] ) }.to raise_error(TypeError)
 					expect{ quoted_type.encode( [['a']] ) }.to raise_error(TypeError)
 				end
@@ -492,29 +492,29 @@ describe "PG::Type derivations" do
 		end
 
 		it "should have reasonable default values" do
-			t = YugabyteYSQL::TextEncoder::String.new
+			t = YSQL::TextEncoder::String.new
 			expect( t.format ).to eq( 0 )
 			expect( t.oid ).to eq( 0 )
 			expect( t.name ).to be_nil
 
-			t = YugabyteYSQL::BinaryEncoder::Int4.new
+			t = YSQL::BinaryEncoder::Int4.new
 			expect( t.format ).to eq( 1 )
 			expect( t.oid ).to eq( 0 )
 			expect( t.name ).to be_nil
 
-			t = YugabyteYSQL::TextDecoder::String.new
+			t = YSQL::TextDecoder::String.new
 			expect( t.format ).to eq( 0 )
 			expect( t.oid ).to eq( 0 )
 			expect( t.name ).to be_nil
 
-			t = YugabyteYSQL::BinaryDecoder::String.new
+			t = YSQL::BinaryDecoder::String.new
 			expect( t.format ).to eq( 1 )
 			expect( t.oid ).to eq( 0 )
 			expect( t.name ).to be_nil
 		end
 
 		it "should overwrite default values as kwargs" do
-			t = YugabyteYSQL::BinaryEncoder::Int4.new(format: 0)
+			t = YSQL::BinaryEncoder::Int4.new(format: 0)
 			expect( t.format ).to eq( 0 )
 		end
 
@@ -538,72 +538,72 @@ describe "PG::Type derivations" do
 		it "should overwrite default format" do
 			t = nil
 			expect_deprecated_coder_init do
-				t = YugabyteYSQL::BinaryEncoder::Int4.new({ format: 0})
+				t = YSQL::BinaryEncoder::Int4.new({ format: 0})
 			end
 			expect( t.format ).to eq( 0 )
 
-			t = YugabyteYSQL::BinaryEncoder::Int4.new(format: 0)
+			t = YSQL::BinaryEncoder::Int4.new(format: 0)
 			expect( t.format ).to eq( 0 )
 		end
 
 		it "should take hash argument" do
 			t = nil
-			expect_deprecated_coder_init { t = YugabyteYSQL::TextEncoder::Integer.new({ name: "abcä"}) }
+			expect_deprecated_coder_init { t = YSQL::TextEncoder::Integer.new({ name: "abcä"}) }
 			expect( t.name ).to eq( "abcä" )
-			expect_deprecated_coder_init { t = YugabyteYSQL::BinaryEncoder::Int4.new({ name: "abcä"}) }
+			expect_deprecated_coder_init { t = YSQL::BinaryEncoder::Int4.new({ name: "abcä"}) }
 			expect( t.name ).to eq( "abcä" )
-			expect_deprecated_coder_init { t = YugabyteYSQL::BinaryDecoder::TimestampUtc.new({ name: "abcä"}) }
+			expect_deprecated_coder_init { t = YSQL::BinaryDecoder::TimestampUtc.new({ name: "abcä"}) }
 			expect( t.name ).to eq( "abcä" )
-			expect_deprecated_coder_init { t = YugabyteYSQL::BinaryDecoder::TimestampUtcToLocal.new({ name: "abcä"}) }
+			expect_deprecated_coder_init { t = YSQL::BinaryDecoder::TimestampUtcToLocal.new({ name: "abcä"}) }
 			expect( t.name ).to eq( "abcä" )
-			expect_deprecated_coder_init { t = YugabyteYSQL::BinaryDecoder::TimestampLocal.new({ name: "abcä"}) }
+			expect_deprecated_coder_init { t = YSQL::BinaryDecoder::TimestampLocal.new({ name: "abcä"}) }
 			expect( t.name ).to eq( "abcä" )
-			expect_deprecated_coder_init { t = YugabyteYSQL::BinaryEncoder::TimestampUtc.new({ name: "abcä"}) }
+			expect_deprecated_coder_init { t = YSQL::BinaryEncoder::TimestampUtc.new({ name: "abcä"}) }
 			expect( t.name ).to eq( "abcä" )
-			expect_deprecated_coder_init { t = YugabyteYSQL::BinaryEncoder::TimestampLocal.new({ name: "abcä"}) }
+			expect_deprecated_coder_init { t = YSQL::BinaryEncoder::TimestampLocal.new({ name: "abcä"}) }
 			expect( t.name ).to eq( "abcä" )
-			expect_deprecated_coder_init { t = YugabyteYSQL::TextDecoder::TimestampUtc.new({ name: "abcä"}) }
+			expect_deprecated_coder_init { t = YSQL::TextDecoder::TimestampUtc.new({ name: "abcä"}) }
 			expect( t.name ).to eq( "abcä" )
-			expect_deprecated_coder_init { t = YugabyteYSQL::TextDecoder::TimestampUtcToLocal.new({ name: "abcä"}) }
+			expect_deprecated_coder_init { t = YSQL::TextDecoder::TimestampUtcToLocal.new({ name: "abcä"}) }
 			expect( t.name ).to eq( "abcä" )
-			expect_deprecated_coder_init { t = YugabyteYSQL::TextDecoder::TimestampLocal.new({ name: "abcä"}) }
+			expect_deprecated_coder_init { t = YSQL::TextDecoder::TimestampLocal.new({ name: "abcä"}) }
 			expect( t.name ).to eq( "abcä" )
-			expect_deprecated_coder_init { t = YugabyteYSQL::TextDecoder::TimestampWithoutTimeZone.new({ name: "abcä"}) }
+			expect_deprecated_coder_init { t = YSQL::TextDecoder::TimestampWithoutTimeZone.new({ name: "abcä"}) }
 			expect( t.name ).to eq( "abcä" )
-			expect_deprecated_coder_init { t = YugabyteYSQL::TextDecoder::TimestampWithTimeZone.new({ name: "abcä"}) }
+			expect_deprecated_coder_init { t = YSQL::TextDecoder::TimestampWithTimeZone.new({ name: "abcä"}) }
 			expect( t.name ).to eq( "abcä" )
 		end
 
 		it "shouldn't overwrite timestamp flags" do
-			t = YugabyteYSQL::TextDecoder::TimestampUtc.new({ flags: YugabyteYSQL::Coder::TIMESTAMP_DB_LOCAL})
-			expect( t.flags ).to eq(YugabyteYSQL::Coder::TIMESTAMP_DB_UTC | YugabyteYSQL::Coder::TIMESTAMP_APP_UTC )
-			t = YugabyteYSQL::TextDecoder::TimestampUtcToLocal.new({ flags: YugabyteYSQL::Coder::TIMESTAMP_APP_UTC})
-			expect( t.flags ).to eq(YugabyteYSQL::Coder::TIMESTAMP_DB_UTC | YugabyteYSQL::Coder::TIMESTAMP_APP_LOCAL )
-			t = YugabyteYSQL::TextDecoder::TimestampLocal.new({ flags: YugabyteYSQL::Coder::TIMESTAMP_DB_UTC})
-			expect( t.flags ).to eq(YugabyteYSQL::Coder::TIMESTAMP_DB_LOCAL | YugabyteYSQL::Coder::TIMESTAMP_APP_LOCAL )
+			t = YSQL::TextDecoder::TimestampUtc.new({ flags: YSQL::Coder::TIMESTAMP_DB_LOCAL})
+			expect( t.flags ).to eq(YSQL::Coder::TIMESTAMP_DB_UTC | YSQL::Coder::TIMESTAMP_APP_UTC )
+			t = YSQL::TextDecoder::TimestampUtcToLocal.new({ flags: YSQL::Coder::TIMESTAMP_APP_UTC})
+			expect( t.flags ).to eq(YSQL::Coder::TIMESTAMP_DB_UTC | YSQL::Coder::TIMESTAMP_APP_LOCAL )
+			t = YSQL::TextDecoder::TimestampLocal.new({ flags: YSQL::Coder::TIMESTAMP_DB_UTC})
+			expect( t.flags ).to eq(YSQL::Coder::TIMESTAMP_DB_LOCAL | YSQL::Coder::TIMESTAMP_APP_LOCAL )
 
-			t = YugabyteYSQL::BinaryDecoder::TimestampUtc.new({ flags: YugabyteYSQL::Coder::TIMESTAMP_DB_LOCAL})
-			expect( t.flags ).to eq(YugabyteYSQL::Coder::TIMESTAMP_DB_UTC | YugabyteYSQL::Coder::TIMESTAMP_APP_UTC )
-			t = YugabyteYSQL::BinaryDecoder::TimestampUtcToLocal.new({ flags: YugabyteYSQL::Coder::TIMESTAMP_APP_UTC})
-			expect( t.flags ).to eq(YugabyteYSQL::Coder::TIMESTAMP_DB_UTC | YugabyteYSQL::Coder::TIMESTAMP_APP_LOCAL )
-			t = YugabyteYSQL::BinaryDecoder::TimestampLocal.new({ flags: YugabyteYSQL::Coder::TIMESTAMP_DB_UTC})
-			expect( t.flags ).to eq(YugabyteYSQL::Coder::TIMESTAMP_DB_LOCAL | YugabyteYSQL::Coder::TIMESTAMP_APP_LOCAL )
+			t = YSQL::BinaryDecoder::TimestampUtc.new({ flags: YSQL::Coder::TIMESTAMP_DB_LOCAL})
+			expect( t.flags ).to eq(YSQL::Coder::TIMESTAMP_DB_UTC | YSQL::Coder::TIMESTAMP_APP_UTC )
+			t = YSQL::BinaryDecoder::TimestampUtcToLocal.new({ flags: YSQL::Coder::TIMESTAMP_APP_UTC})
+			expect( t.flags ).to eq(YSQL::Coder::TIMESTAMP_DB_UTC | YSQL::Coder::TIMESTAMP_APP_LOCAL )
+			t = YSQL::BinaryDecoder::TimestampLocal.new({ flags: YSQL::Coder::TIMESTAMP_DB_UTC})
+			expect( t.flags ).to eq(YSQL::Coder::TIMESTAMP_DB_LOCAL | YSQL::Coder::TIMESTAMP_APP_LOCAL )
 
-			t = YugabyteYSQL::BinaryEncoder::TimestampUtc.new({ flags: YugabyteYSQL::Coder::TIMESTAMP_DB_LOCAL})
-			expect( t.flags ).to eq(YugabyteYSQL::Coder::TIMESTAMP_DB_UTC )
-			t = YugabyteYSQL::BinaryEncoder::TimestampLocal.new({ flags: YugabyteYSQL::Coder::TIMESTAMP_APP_LOCAL})
-			expect( t.flags ).to eq(YugabyteYSQL::Coder::TIMESTAMP_DB_LOCAL )
+			t = YSQL::BinaryEncoder::TimestampUtc.new({ flags: YSQL::Coder::TIMESTAMP_DB_LOCAL})
+			expect( t.flags ).to eq(YSQL::Coder::TIMESTAMP_DB_UTC )
+			t = YSQL::BinaryEncoder::TimestampLocal.new({ flags: YSQL::Coder::TIMESTAMP_APP_LOCAL})
+			expect( t.flags ).to eq(YSQL::Coder::TIMESTAMP_DB_LOCAL )
 		end
 
 		it "should deny changes when frozen" do
-			t = YugabyteYSQL::TextEncoder::String.new.freeze
+			t = YSQL::TextEncoder::String.new.freeze
 			expect{ t.format = 1 }.to raise_error(FrozenError)
 			expect{ t.oid = 0  }.to raise_error(FrozenError)
 			expect{ t.name = "x" }.to raise_error(FrozenError)
 		end
 
 		it "should be shareable for Ractor", :ractor do
-			t = YugabyteYSQL::TextEncoder::String.new.freeze
+			t = YSQL::TextEncoder::String.new.freeze
 			Ractor.make_shareable(t)
 		end
 
@@ -613,20 +613,20 @@ describe "PG::Type derivations" do
 		end
 	end
 
-	describe YugabyteYSQL::CompositeCoder do
+	describe YSQL::CompositeCoder do
 		describe "Array types" do
-			let!(:textenc_string_array) { YugabyteYSQL::TextEncoder::Array.new elements_type: textenc_string }
-			let!(:textdec_string_array) { YugabyteYSQL::TextDecoder::Array.new elements_type: textdec_string }
-			let!(:textdec_string_array_raise) { YugabyteYSQL::TextDecoder::Array.new elements_type: textdec_string, flags: YugabyteYSQL::Coder:: FORMAT_ERROR_TO_RAISE }
-			let!(:textenc_int_array) { YugabyteYSQL::TextEncoder::Array.new elements_type: textenc_int, needs_quotation: false }
-			let!(:textdec_int_array) { YugabyteYSQL::TextDecoder::Array.new elements_type: textdec_int, needs_quotation: false }
-			let!(:textenc_float_array) { YugabyteYSQL::TextEncoder::Array.new elements_type: textenc_float, needs_quotation: false }
-			let!(:textdec_float_array) { YugabyteYSQL::TextDecoder::Array.new elements_type: textdec_float, needs_quotation: false }
-			let!(:textenc_timestamp_array) { YugabyteYSQL::TextEncoder::Array.new elements_type: textenc_timestamp, needs_quotation: false }
-			let!(:textdec_timestamp_array) { YugabyteYSQL::TextDecoder::Array.new elements_type: textdec_timestamp, needs_quotation: false }
-			let!(:textenc_string_array_with_delimiter) { YugabyteYSQL::TextEncoder::Array.new elements_type: textenc_string, delimiter: ';' }
-			let!(:textdec_string_array_with_delimiter) { YugabyteYSQL::TextDecoder::Array.new elements_type: textdec_string, delimiter: ';' }
-			let!(:textdec_bytea_array) { YugabyteYSQL::TextDecoder::Array.new elements_type: textdec_bytea }
+			let!(:textenc_string_array) { YSQL::TextEncoder::Array.new elements_type: textenc_string }
+			let!(:textdec_string_array) { YSQL::TextDecoder::Array.new elements_type: textdec_string }
+			let!(:textdec_string_array_raise) { YSQL::TextDecoder::Array.new elements_type: textdec_string, flags: YSQL::Coder:: FORMAT_ERROR_TO_RAISE }
+			let!(:textenc_int_array) { YSQL::TextEncoder::Array.new elements_type: textenc_int, needs_quotation: false }
+			let!(:textdec_int_array) { YSQL::TextDecoder::Array.new elements_type: textdec_int, needs_quotation: false }
+			let!(:textenc_float_array) { YSQL::TextEncoder::Array.new elements_type: textenc_float, needs_quotation: false }
+			let!(:textdec_float_array) { YSQL::TextDecoder::Array.new elements_type: textdec_float, needs_quotation: false }
+			let!(:textenc_timestamp_array) { YSQL::TextEncoder::Array.new elements_type: textenc_timestamp, needs_quotation: false }
+			let!(:textdec_timestamp_array) { YSQL::TextDecoder::Array.new elements_type: textdec_timestamp, needs_quotation: false }
+			let!(:textenc_string_array_with_delimiter) { YSQL::TextEncoder::Array.new elements_type: textenc_string, delimiter: ';' }
+			let!(:textdec_string_array_with_delimiter) { YSQL::TextDecoder::Array.new elements_type: textdec_string, delimiter: ';' }
+			let!(:textdec_bytea_array) { YSQL::TextDecoder::Array.new elements_type: textdec_bytea }
 
 			#
 			# Array parser specs are thankfully borrowed from here:
@@ -793,12 +793,12 @@ describe "PG::Type derivations" do
 				end
 
 				it 'should decode array of types with decoder in ruby space' do
-					array_type = YugabyteYSQL::TextDecoder::Array.new elements_type: intdec_incrementer
+					array_type = YSQL::TextDecoder::Array.new elements_type: intdec_incrementer
 					expect( array_type.decode(%[{3,4}]) ).to eq( [4,5] )
 				end
 
 				it 'should decode array of nil types' do
-					array_type = YugabyteYSQL::TextDecoder::Array.new elements_type: nil
+					array_type = YSQL::TextDecoder::Array.new elements_type: nil
 					expect( array_type.decode(%[{3,4}]) ).to eq( ['3','4'] )
 				end
 			end
@@ -842,40 +842,40 @@ describe "PG::Type derivations" do
 
 				context 'array of types with encoder in ruby space' do
 					it 'encodes with quotation and default character encoding' do
-						array_type = YugabyteYSQL::TextEncoder::Array.new elements_type: intenc_incrementer, needs_quotation: true
+						array_type = YSQL::TextEncoder::Array.new elements_type: intenc_incrementer, needs_quotation: true
 						r = array_type.encode([3,4])
 						expect( r ).to eq( %[{"4 ","5 "}] )
 						expect( r.encoding ).to eq( Encoding::ASCII_8BIT )
 					end
 
 					it 'encodes with quotation and given character encoding' do
-						array_type = YugabyteYSQL::TextEncoder::Array.new elements_type: intenc_incrementer, needs_quotation: true
+						array_type = YSQL::TextEncoder::Array.new elements_type: intenc_incrementer, needs_quotation: true
 						r = array_type.encode([3,4], Encoding::CP850)
 						expect( r ).to eq( %[{"4 ","5 "}] )
 						expect( r.encoding ).to eq( Encoding::CP850 )
 					end
 
 					it 'encodes without quotation' do
-						array_type = YugabyteYSQL::TextEncoder::Array.new elements_type: intenc_incrementer, needs_quotation: false
+						array_type = YSQL::TextEncoder::Array.new elements_type: intenc_incrementer, needs_quotation: false
 						expect( array_type.encode([3,4]) ).to eq( %[{4 ,5 }] )
 					end
 
 					it 'encodes with default character encoding' do
-						array_type = YugabyteYSQL::TextEncoder::Array.new elements_type: intenc_incrementer_with_encoding
+						array_type = YSQL::TextEncoder::Array.new elements_type: intenc_incrementer_with_encoding
 						r = array_type.encode([3,4])
 						expect( r ).to eq( %[{"4 ASCII-8BIT","5 ASCII-8BIT"}] )
 						expect( r.encoding ).to eq( Encoding::ASCII_8BIT )
 					end
 
 					it 'encodes with given character encoding' do
-						array_type = YugabyteYSQL::TextEncoder::Array.new elements_type: intenc_incrementer_with_encoding
+						array_type = YSQL::TextEncoder::Array.new elements_type: intenc_incrementer_with_encoding
 						r = array_type.encode([3,4], Encoding::CP850)
 						expect( r ).to eq( %[{"4 CP850","5 CP850"}] )
 						expect( r.encoding ).to eq( Encoding::CP850 )
 					end
 
 					it "should raise when ruby encoder returns non string values" do
-						array_type = YugabyteYSQL::TextEncoder::Array.new elements_type: intenc_incrementer_with_int_result, needs_quotation: false
+						array_type = YSQL::TextEncoder::Array.new elements_type: intenc_incrementer_with_int_result, needs_quotation: false
 						expect{ array_type.encode([3,4]) }.to raise_error(TypeError)
 					end
 				end
@@ -887,12 +887,12 @@ describe "PG::Type derivations" do
 
 				context 'literal quotation' do
 					it 'should quote and escape literals' do
-						quoted_type = YugabyteYSQL::TextEncoder::QuotedLiteral.new elements_type: textenc_string_array
+						quoted_type = YSQL::TextEncoder::QuotedLiteral.new elements_type: textenc_string_array
 						expect( quoted_type.encode(["'A\",","\\B'"]) ).to eq( %['{"''A\\",","\\\\B''"}'] )
 					end
 
 					it 'should quote literals with correct character encoding' do
-						quoted_type = YugabyteYSQL::TextEncoder::QuotedLiteral.new elements_type: textenc_string_array
+						quoted_type = YSQL::TextEncoder::QuotedLiteral.new elements_type: textenc_string_array
 						v = quoted_type.encode(["Héllo"], "iso-8859-1")
 						expect( v.encoding ).to eq( Encoding::ISO_8859_1 )
 						expect( v ).to eq( %['{Héllo}'].encode(Encoding::ISO_8859_1) )
@@ -920,11 +920,11 @@ describe "PG::Type derivations" do
 			end
 
 			it "shouldn't accept invalid elements_types" do
-				expect{ YugabyteYSQL::TextEncoder::Array.new elements_type: false }.to raise_error(TypeError)
+				expect{ YSQL::TextEncoder::Array.new elements_type: false }.to raise_error(TypeError)
 			end
 
 			it "should have reasonable default values" do
-				t = YugabyteYSQL::TextEncoder::Array.new
+				t = YSQL::TextEncoder::Array.new
 				expect( t.format ).to eq( 0 )
 				expect( t.oid ).to eq( 0 )
 				expect( t.name ).to be_nil
@@ -934,7 +934,7 @@ describe "PG::Type derivations" do
 			end
 
 		it "should deny changes when frozen" do
-			t = YugabyteYSQL::TextEncoder::Array.new.freeze
+			t = YSQL::TextEncoder::Array.new.freeze
 			expect{ t.format = 1 }.to raise_error(FrozenError)
 			expect{ t.oid = 0  }.to raise_error(FrozenError)
 			expect{ t.name = "x" }.to raise_error(FrozenError)
@@ -944,7 +944,7 @@ describe "PG::Type derivations" do
 		end
 
 		it "should be shareable for Ractor", :ractor do
-			t = YugabyteYSQL::TextEncoder::Array.new.freeze
+			t = YSQL::TextEncoder::Array.new.freeze
 			Ractor.make_shareable(t)
 		end
 
@@ -955,7 +955,7 @@ describe "PG::Type derivations" do
 	end
 
 		it "should encode Strings as base64 in TextEncoder" do
-			e = YugabyteYSQL::TextEncoder::ToBase64.new
+			e = YSQL::TextEncoder::ToBase64.new
 			expect( e.encode("") ).to eq("")
 			expect( e.encode("x") ).to eq("eA==")
 			expect( e.encode("xx") ).to eq("eHg=")
@@ -967,14 +967,14 @@ describe "PG::Type derivations" do
 		end
 
 		it 'should encode Strings as base64 with correct character encoding' do
-			e = YugabyteYSQL::TextEncoder::ToBase64.new
+			e = YSQL::TextEncoder::ToBase64.new
 			v = e.encode("Héllo".encode("utf-16le"), "iso-8859-1")
 			expect( v ).to eq("SOlsbG8=")
 			expect( v.encoding ).to eq(Encoding::ISO_8859_1)
 		end
 
 		it "should encode Strings as base64 in BinaryDecoder" do
-			e = YugabyteYSQL::BinaryDecoder::ToBase64.new
+			e = YSQL::BinaryDecoder::ToBase64.new
 			expect( e.decode("x") ).to eq("eA==")
 			v = e.decode("Héllo".encode("utf-16le"))
 			expect( v ).to eq("SADpAGwAbABvAA==")
@@ -983,7 +983,7 @@ describe "PG::Type derivations" do
 
 		it "should encode Integers as base64" do
 			# Not really useful, but ensures that two-pass element and composite element encoders work.
-			e = YugabyteYSQL::TextEncoder::ToBase64.new(elements_type: YugabyteYSQL::TextEncoder::Array.new(elements_type: YugabyteYSQL::TextEncoder::Integer.new, needs_quotation: false ))
+			e = YSQL::TextEncoder::ToBase64.new(elements_type: YSQL::TextEncoder::Array.new(elements_type: YSQL::TextEncoder::Integer.new, needs_quotation: false ))
 			expect( e.encode([1]) ).to eq(["{1}"].pack("m").chomp)
 			expect( e.encode([12]) ).to eq(["{12}"].pack("m").chomp)
 			expect( e.encode([123]) ).to eq(["{123}"].pack("m").chomp)
@@ -994,7 +994,7 @@ describe "PG::Type derivations" do
 		end
 
 		it "should decode base64 to Strings in TextDecoder" do
-			e = YugabyteYSQL::TextDecoder::FromBase64.new
+			e = YSQL::TextDecoder::FromBase64.new
 			expect( e.decode("") ).to eq("")
 			expect( e.decode("eA==") ).to eq("x")
 			expect( e.decode("eHg=") ).to eq("xx")
@@ -1006,16 +1006,16 @@ describe "PG::Type derivations" do
 		end
 
 		it "should decode base64 in BinaryEncoder" do
-			e = YugabyteYSQL::BinaryEncoder::FromBase64.new
+			e = YSQL::BinaryEncoder::FromBase64.new
 			expect( e.encode("eA==") ).to eq("x")
 
-			e = YugabyteYSQL::BinaryEncoder::FromBase64.new(elements_type: YugabyteYSQL::TextEncoder::Integer.new )
+			e = YSQL::BinaryEncoder::FromBase64.new(elements_type: YSQL::TextEncoder::Integer.new )
 			expect( e.encode(124) ).to eq("124=".unpack("m")[0])
 		end
 
 		it "should decode base64 to Integers" do
 			# Not really useful, but ensures that composite element encoders work.
-			e = YugabyteYSQL::TextDecoder::FromBase64.new(elements_type: YugabyteYSQL::TextDecoder::Array.new(elements_type: YugabyteYSQL::TextDecoder::Integer.new ))
+			e = YSQL::TextDecoder::FromBase64.new(elements_type: YSQL::TextDecoder::Array.new(elements_type: YSQL::TextDecoder::Integer.new ))
 			expect( e.decode(["{1}"].pack("m")) ).to eq([1])
 			expect( e.decode(["{12}"].pack("m")) ).to eq([12])
 			expect( e.decode(["{123}"].pack("m")) ).to eq([123])
@@ -1025,12 +1025,12 @@ describe "PG::Type derivations" do
 			expect( e.decode(["{1234567}"].pack("m")) ).to eq([1234567])
 			expect( e.decode(["{12345678}"].pack("m")) ).to eq([12345678])
 
-			e = YugabyteYSQL::TextDecoder::FromBase64.new(elements_type: YugabyteYSQL::BinaryDecoder::Integer.new )
+			e = YSQL::TextDecoder::FromBase64.new(elements_type: YSQL::BinaryDecoder::Integer.new )
 			expect( e.decode("ALxhTg==") ).to eq(12345678)
 		end
 
 		it "should decode base64 with garbage" do
-			e = YugabyteYSQL::TextDecoder::FromBase64.new format: 1
+			e = YSQL::TextDecoder::FromBase64.new format: 1
 			expect( e.decode("=") ).to eq("=".unpack("m")[0])
 			expect( e.decode("==") ).to eq("==".unpack("m")[0])
 			expect( e.decode("===") ).to eq("===".unpack("m")[0])
@@ -1054,15 +1054,15 @@ describe "PG::Type derivations" do
 		end
 	end
 
-	describe YugabyteYSQL::CopyCoder do
-		describe YugabyteYSQL::TextEncoder::CopyRow do
+	describe YSQL::CopyCoder do
+		describe YSQL::TextEncoder::CopyRow do
 			context "with default typemap" do
 				let!(:encoder) do
-					YugabyteYSQL::TextEncoder::CopyRow.new
+					YSQL::TextEncoder::CopyRow.new
 				end
 
 				it "should deny changes when frozen" do
-					t = YugabyteYSQL::TextEncoder::CopyRow.new.freeze
+					t = YSQL::TextEncoder::CopyRow.new.freeze
 					expect{ t.format = 1 }.to raise_error(FrozenError)
 					expect{ t.oid = 0  }.to raise_error(FrozenError)
 					expect{ t.name = "x" }.to raise_error(FrozenError)
@@ -1072,7 +1072,7 @@ describe "PG::Type derivations" do
 				end
 
 				it "should be shareable for Ractor", :ractor do
-					t = YugabyteYSQL::TextEncoder::CopyRow.new.freeze
+					t = YSQL::TextEncoder::CopyRow.new.freeze
 					Ractor.make_shareable(t)
 				end
 
@@ -1094,14 +1094,14 @@ describe "PG::Type derivations" do
 
 			context "with TypeMapByClass" do
 				let!(:tm) do
-					tm = YugabyteYSQL::TypeMapByClass.new
+					tm = YSQL::TypeMapByClass.new
 					tm[Integer] = textenc_int
 					tm[Float] = intenc_incrementer
-					tm[Array] = YugabyteYSQL::TextEncoder::Array.new elements_type: textenc_string
+					tm[Array] = YSQL::TextEncoder::Array.new elements_type: textenc_string
 					tm
 				end
 				let!(:encoder) do
-					YugabyteYSQL::TextEncoder::CopyRow.new type_map: tm
+					YSQL::TextEncoder::CopyRow.new type_map: tm
 				end
 
 				it "should have reasonable default values" do
@@ -1114,13 +1114,13 @@ describe "PG::Type derivations" do
 					encoder.name = "test"
 					encoder.delimiter = "#"
 					encoder.null_string = "NULL"
-					encoder.type_map = YugabyteYSQL::TypeMapByColumn.new []
+					encoder.type_map = YSQL::TypeMapByColumn.new []
 					encoder2 = encoder.dup
 					expect( encoder.object_id ).to_not eq( encoder2.object_id )
 					expect( encoder2.name ).to eq( "test" )
 					expect( encoder2.delimiter ).to eq( "#" )
 					expect( encoder2.null_string ).to eq( "NULL" )
-					expect( encoder2.type_map ).to be_a_kind_of(YugabyteYSQL::TypeMapByColumn )
+					expect( encoder2.type_map ).to be_a_kind_of(YSQL::TypeMapByColumn )
 				end
 
 				describe '#encode' do
@@ -1144,10 +1144,10 @@ describe "PG::Type derivations" do
 			end
 		end
 
-		describe YugabyteYSQL::BinaryEncoder::CopyRow do
+		describe YSQL::BinaryEncoder::CopyRow do
 			context "with default typemap" do
 				let!(:encoder) do
-					YugabyteYSQL::BinaryEncoder::CopyRow.new
+					YSQL::BinaryEncoder::CopyRow.new
 				end
 
 				it "should encode different types of Ruby objects" do
@@ -1164,13 +1164,13 @@ describe "PG::Type derivations" do
 
 			context "with TypeMapByClass" do
 				let!(:tm) do
-					tm = YugabyteYSQL::TypeMapByClass.new
+					tm = YSQL::TypeMapByClass.new
 					tm[Integer] = binaryenc_int4
 					tm[Float] = intenc_incrementer
 					tm
 				end
 				let!(:encoder) do
-					YugabyteYSQL::BinaryEncoder::CopyRow.new type_map: tm
+					YSQL::BinaryEncoder::CopyRow.new type_map: tm
 				end
 
 				it "should have reasonable default values" do
@@ -1179,11 +1179,11 @@ describe "PG::Type derivations" do
 
 				it "copies all attributes with #dup" do
 					encoder.name = "test"
-					encoder.type_map = YugabyteYSQL::TypeMapByColumn.new []
+					encoder.type_map = YSQL::TypeMapByColumn.new []
 					encoder2 = encoder.dup
 					expect( encoder.object_id ).to_not eq( encoder2.object_id )
 					expect( encoder2.name ).to eq( "test" )
-					expect( encoder2.type_map ).to be_a_kind_of(YugabyteYSQL::TypeMapByColumn )
+					expect( encoder2.type_map ).to be_a_kind_of(YSQL::TypeMapByColumn )
 				end
 
 				it "should encode different types of Ruby objects" do
@@ -1195,10 +1195,10 @@ describe "PG::Type derivations" do
 			end
 		end
 
-		describe YugabyteYSQL::TextDecoder::CopyRow do
+		describe YSQL::TextDecoder::CopyRow do
 			context "with default typemap" do
 				let!(:decoder) do
-					YugabyteYSQL::TextDecoder::CopyRow.new
+					YSQL::TextDecoder::CopyRow.new
 				end
 
 				describe '#decode' do
@@ -1217,10 +1217,10 @@ describe "PG::Type derivations" do
 
 			context "with TypeMapByColumn" do
 				let!(:tm) do
-					YugabyteYSQL::TypeMapByColumn.new [textdec_int, textdec_string, intdec_incrementer, nil]
+					YSQL::TypeMapByColumn.new [textdec_int, textdec_string, intdec_incrementer, nil]
 				end
 				let!(:decoder) do
-					YugabyteYSQL::TextDecoder::CopyRow.new type_map: tm
+					YSQL::TextDecoder::CopyRow.new type_map: tm
 				end
 
 				it "should give account about memory usage" do
@@ -1235,10 +1235,10 @@ describe "PG::Type derivations" do
 			end
 		end
 
-		describe YugabyteYSQL::BinaryDecoder::CopyRow do
+		describe YSQL::BinaryDecoder::CopyRow do
 			context "with default typemap" do
 				let!(:decoder) do
-					YugabyteYSQL::BinaryDecoder::CopyRow.new
+					YSQL::BinaryDecoder::CopyRow.new
 				end
 
 				describe '#decode' do
@@ -1279,10 +1279,10 @@ describe "PG::Type derivations" do
 
 			context "with TypeMapByColumn" do
 				let!(:tm) do
-					YugabyteYSQL::TypeMapByColumn.new [binarydec_integer, binarydec_string, intdec_incrementer, nil]
+					YSQL::TypeMapByColumn.new [binarydec_integer, binarydec_string, intdec_incrementer, nil]
 				end
 				let!(:decoder) do
-					YugabyteYSQL::BinaryDecoder::CopyRow.new type_map: tm
+					YSQL::BinaryDecoder::CopyRow.new type_map: tm
 				end
 
 				describe '#decode' do
@@ -1295,15 +1295,15 @@ describe "PG::Type derivations" do
 		end
 	end
 
-	describe YugabyteYSQL::RecordCoder do
-		describe YugabyteYSQL::TextEncoder::Record do
+	describe YSQL::RecordCoder do
+		describe YSQL::TextEncoder::Record do
 			context "with default typemap" do
 				let!(:encoder) do
-					YugabyteYSQL::TextEncoder::Record.new
+					YSQL::TextEncoder::Record.new
 				end
 
 				it "should deny changes when frozen" do
-					t = YugabyteYSQL::TextEncoder::Record.new.freeze
+					t = YSQL::TextEncoder::Record.new.freeze
 					expect{ t.format = 1 }.to raise_error(FrozenError)
 					expect{ t.oid = 0  }.to raise_error(FrozenError)
 					expect{ t.name = "x" }.to raise_error(FrozenError)
@@ -1311,7 +1311,7 @@ describe "PG::Type derivations" do
 				end
 
 				it "should be shareable for Ractor", :ractor do
-					t = YugabyteYSQL::TextEncoder::Record.new.freeze
+					t = YSQL::TextEncoder::Record.new.freeze
 					Ractor.make_shareable(t)
 				end
 
@@ -1333,14 +1333,14 @@ describe "PG::Type derivations" do
 
 			context "with TypeMapByClass" do
 				let!(:tm) do
-					tm = YugabyteYSQL::TypeMapByClass.new
+					tm = YSQL::TypeMapByClass.new
 					tm[Integer] = textenc_int
 					tm[Float] = intenc_incrementer
-					tm[Array] = YugabyteYSQL::TextEncoder::Array.new elements_type: textenc_string
+					tm[Array] = YSQL::TextEncoder::Array.new elements_type: textenc_string
 					tm
 				end
 				let!(:encoder) do
-					YugabyteYSQL::TextEncoder::Record.new type_map: tm
+					YSQL::TextEncoder::Record.new type_map: tm
 				end
 
 				it "should have reasonable default values" do
@@ -1349,11 +1349,11 @@ describe "PG::Type derivations" do
 
 				it "copies all attributes with #dup" do
 					encoder.name = "test"
-					encoder.type_map = YugabyteYSQL::TypeMapByColumn.new []
+					encoder.type_map = YSQL::TypeMapByColumn.new []
 					encoder2 = encoder.dup
 					expect( encoder.object_id ).to_not eq( encoder2.object_id )
 					expect( encoder2.name ).to eq( "test" )
-					expect( encoder2.type_map ).to be_a_kind_of(YugabyteYSQL::TypeMapByColumn )
+					expect( encoder2.type_map ).to be_a_kind_of(YSQL::TypeMapByColumn )
 				end
 
 				describe '#encode' do
@@ -1371,10 +1371,10 @@ describe "PG::Type derivations" do
 			end
 		end
 
-		describe YugabyteYSQL::TextDecoder::Record do
+		describe YSQL::TextDecoder::Record do
 			context "with default typemap" do
 				let!(:decoder) do
-					YugabyteYSQL::TextDecoder::Record.new
+					YSQL::TextDecoder::Record.new
 				end
 
 				it "should give account about memory usage" do
@@ -1403,10 +1403,10 @@ describe "PG::Type derivations" do
 
 			context "with TypeMapByColumn" do
 				let!(:tm) do
-					YugabyteYSQL::TypeMapByColumn.new [textdec_int, textdec_string, intdec_incrementer, nil]
+					YSQL::TypeMapByColumn.new [textdec_int, textdec_string, intdec_incrementer, nil]
 				end
 				let!(:decoder) do
-					YugabyteYSQL::TextDecoder::Record.new type_map: tm
+					YSQL::TextDecoder::Record.new type_map: tm
 				end
 
 				describe '#decode' do

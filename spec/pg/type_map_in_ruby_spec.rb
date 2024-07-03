@@ -6,33 +6,33 @@ require_relative '../helpers'
 require 'ysql'
 
 
-describe YugabyteYSQL::TypeMapInRuby do
+describe YSQL::TypeMapInRuby do
 
 	it "should deny changes when frozen" do
-		tm = YugabyteYSQL::TypeMapInRuby.new.freeze
-		expect{ tm.default_type_map = YugabyteYSQL::TypeMapByClass.new }.to raise_error(FrozenError)
-		expect{ tm.with_default_type_map(YugabyteYSQL::TypeMapByClass.new) }.to raise_error(FrozenError)
+		tm = YSQL::TypeMapInRuby.new.freeze
+		expect{ tm.default_type_map = YSQL::TypeMapByClass.new }.to raise_error(FrozenError)
+		expect{ tm.with_default_type_map(YSQL::TypeMapByClass.new) }.to raise_error(FrozenError)
 	end
 
 	it "should be shareable for Ractor", :ractor do
-		tm = YugabyteYSQL::TypeMapInRuby.new.freeze
+		tm = YSQL::TypeMapInRuby.new.freeze
 		Ractor.make_shareable(tm)
 	end
 
 	it "should give account about memory usage" do
-		tm = YugabyteYSQL::TypeMapInRuby.new.freeze
+		tm = YSQL::TypeMapInRuby.new.freeze
 		expect( ObjectSpace.memsize_of(tm) ).to be > DATA_OBJ_MEMSIZE
 	end
 
 	context "result values" do
 		it "should be usable non-derived" do
-			tm = YugabyteYSQL::TypeMapInRuby.new.freeze
+			tm = YSQL::TypeMapInRuby.new.freeze
 			res = @conn.exec("select 5").map_types!(tm)
 			expect( res.getvalue(0,0) ).to eq( "5" )
 		end
 
 		it "should call derived result mapping methods" do
-			tm = Class.new(YugabyteYSQL::TypeMapInRuby) do
+			tm = Class.new(YSQL::TypeMapInRuby) do
 				attr_reader :fit_to_result_args
 
 				def fit_to_result(*args)
@@ -51,7 +51,7 @@ describe YugabyteYSQL::TypeMapInRuby do
 		end
 
 		it "should accept only a type map object from fit_to_result" do
-			tm = Class.new(YugabyteYSQL::TypeMapInRuby) do
+			tm = Class.new(YSQL::TypeMapInRuby) do
 				def fit_to_result(*args)
 					:invalid
 				end
@@ -64,13 +64,13 @@ describe YugabyteYSQL::TypeMapInRuby do
 
 	context "query bind params" do
 		it "should be usable non-derived" do
-			tm = YugabyteYSQL::TypeMapInRuby.new.freeze
+			tm = YSQL::TypeMapInRuby.new.freeze
 			res = @conn.exec_params("select $1::int, $2::text", [5, 6], 0, tm)
 			expect( res.values ).to eq( [["5", "6"]] )
 		end
 
 		it "should call derived param mapping methods" do
-			tm = Class.new(YugabyteYSQL::TypeMapInRuby) do
+			tm = Class.new(YSQL::TypeMapInRuby) do
 				attr_reader :fit_to_query_args
 				attr_reader :typecast_query_param_args
 
@@ -82,7 +82,7 @@ describe YugabyteYSQL::TypeMapInRuby do
 
 				def typecast_query_param(*args)
 					@typecast_query_param_args << [args, super]
-					YugabyteYSQL::TextEncoder::Integer.new name: 'INT4', oid: 23
+					YSQL::TextEncoder::Integer.new name: 'INT4', oid: 23
 				end
 			end.new
 
@@ -95,14 +95,14 @@ describe YugabyteYSQL::TypeMapInRuby do
 
 	context "put_copy_data" do
 		it "should be usable non-derived" do
-			tm = YugabyteYSQL::TypeMapInRuby.new.freeze
-			ce = YugabyteYSQL::TextEncoder::CopyRow.new(type_map: tm).freeze
+			tm = YSQL::TypeMapInRuby.new.freeze
+			ce = YSQL::TextEncoder::CopyRow.new(type_map: tm).freeze
 			res = ce.encode([5, 6])
 			expect( res ).to eq( "5\t6\n" )
 		end
 
 		it "should call derived data mapping methods" do
-			tm = Class.new(YugabyteYSQL::TypeMapInRuby) do
+			tm = Class.new(YSQL::TypeMapInRuby) do
 				attr_reader :fit_to_query_args
 				attr_reader :typecast_query_param_args
 
@@ -114,11 +114,11 @@ describe YugabyteYSQL::TypeMapInRuby do
 
 				def typecast_query_param(*args)
 					@typecast_query_param_args << [args, super]
-					YugabyteYSQL::TextEncoder::Integer.new name: 'INT4', oid: 23
+					YSQL::TextEncoder::Integer.new name: 'INT4', oid: 23
 				end
 			end.new
 
-			ce = YugabyteYSQL::TextEncoder::CopyRow.new type_map: tm
+			ce = YSQL::TextEncoder::CopyRow.new type_map: tm
 			res = ce.encode([5, 6])
 			expect( res ).to eq( "5\t6\n" )
 			expect( tm.fit_to_query_args ).to eq( [5, 6] )
@@ -126,27 +126,27 @@ describe YugabyteYSQL::TypeMapInRuby do
 		end
 
 		it "shouldn't accept invalid return from typecast_query_param" do
-			tm = Class.new(YugabyteYSQL::TypeMapInRuby) do
+			tm = Class.new(YSQL::TypeMapInRuby) do
 				def typecast_query_param(*args)
 					:invalid
 				end
 			end.new.freeze
 
-			ce = YugabyteYSQL::TextEncoder::CopyRow.new(type_map: tm).freeze
+			ce = YSQL::TextEncoder::CopyRow.new(type_map: tm).freeze
 			expect{ ce.encode([5, 6]) }.to raise_error(TypeError, /nil or kind of PG::Coder/)
 		end
 	end
 
 	context "get_copy_data" do
 		it "should be usable non-derived" do
-			tm = YugabyteYSQL::TypeMapInRuby.new.freeze
-			ce = YugabyteYSQL::TextDecoder::CopyRow.new(type_map: tm).freeze
+			tm = YSQL::TypeMapInRuby.new.freeze
+			ce = YSQL::TextDecoder::CopyRow.new(type_map: tm).freeze
 			res = ce.decode("5\t6\n")
 			expect( res ).to eq( ["5", "6"] )
 		end
 
 		it "should call derived data mapping methods" do
-			tm = Class.new(YugabyteYSQL::TypeMapInRuby) do
+			tm = Class.new(YSQL::TypeMapInRuby) do
 				attr_reader :fit_to_copy_get_args
 
 				def fit_to_copy_get(*args)
@@ -159,20 +159,20 @@ describe YugabyteYSQL::TypeMapInRuby do
 				end
 			end.new
 
-			ce = YugabyteYSQL::TextDecoder::CopyRow.new type_map: tm
+			ce = YSQL::TextDecoder::CopyRow.new type_map: tm
 			res = ce.decode("5\t6\n")
 			expect( tm.fit_to_copy_get_args ).to eq( [] )
 			expect( res ).to eq( [["5", 0, 0, Encoding::UTF_8, "5"], ["6", 1, 0, Encoding::UTF_8, "6"]] )
 		end
 
 		it "shouldn't accept invalid return from fit_to_copy_get" do
-			tm = Class.new(YugabyteYSQL::TypeMapInRuby) do
+			tm = Class.new(YSQL::TypeMapInRuby) do
 				def fit_to_copy_get
 					:invalid
 				end
 			end.new.freeze
 
-			ce = YugabyteYSQL::TextDecoder::CopyRow.new(type_map: tm).freeze
+			ce = YSQL::TextDecoder::CopyRow.new(type_map: tm).freeze
 			expect{ ce.decode("5\t6\n") }.to raise_error(TypeError, /kind of Integer/)
 		end
 	end

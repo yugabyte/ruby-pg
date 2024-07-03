@@ -4,25 +4,25 @@
 require_relative '../helpers'
 
 describe 'Basic type mapping' do
-	describe YugabyteYSQL::BasicTypeMapBasedOnResult do
+	describe YSQL::BasicTypeMapBasedOnResult do
 		let!(:basic_type_mapping) do
-			YugabyteYSQL::BasicTypeMapBasedOnResult.new(@conn).freeze
+			YSQL::BasicTypeMapBasedOnResult.new(@conn).freeze
 		end
 
 		it "can be initialized with a CoderMapsBundle instead of a connection" do
-			maps = YugabyteYSQL::BasicTypeRegistry::CoderMapsBundle.new(@conn).freeze
-			tm = YugabyteYSQL::BasicTypeMapBasedOnResult.new(maps)
-			expect( tm.rm_coder(0, 16) ).to be_kind_of(YugabyteYSQL::TextEncoder::Boolean)
+			maps = YSQL::BasicTypeRegistry::CoderMapsBundle.new(@conn).freeze
+			tm = YSQL::BasicTypeMapBasedOnResult.new(maps)
+			expect( tm.rm_coder(0, 16) ).to be_kind_of(YSQL::TextEncoder::Boolean)
 		end
 
 		it "can be initialized with a custom type registry" do
-			regi = YugabyteYSQL::BasicTypeRegistry.new
-			regi.register_type 1, 'int4', YugabyteYSQL::BinaryEncoder::Int8, nil
-			tm = YugabyteYSQL::BasicTypeMapBasedOnResult.new(@conn, registry: regi).freeze
+			regi = YSQL::BasicTypeRegistry.new
+			regi.register_type 1, 'int4', YSQL::BinaryEncoder::Int8, nil
+			tm = YSQL::BasicTypeMapBasedOnResult.new(@conn, registry: regi).freeze
 
 			res = @conn.exec_params( "SELECT 123::INT4", [], 1 )
 			tm2 = tm.build_column_map( res )
-			expect( tm2.coders.map(&:class) ).to eq( [YugabyteYSQL::BinaryEncoder::Int8] )
+			expect( tm2.coders.map(&:class) ).to eq( [YSQL::BinaryEncoder::Int8] )
 		end
 
 		it "should be shareable for Ractor", :ractor do
@@ -31,14 +31,14 @@ describe 'Basic type mapping' do
 
 		it "should be usable with Ractor", :ractor do
 			vals = Ractor.new(@conninfo) do |conninfo|
-				conn = YugabyteYSQL.connect(conninfo)
-				basic_type_mapping = YugabyteYSQL::BasicTypeMapBasedOnResult.new(conn)
+				conn = YSQL.connect(conninfo)
+				basic_type_mapping = YSQL::BasicTypeMapBasedOnResult.new(conn)
 				conn.exec( "CREATE TEMP TABLE copytable (t TEXT, i INT, ai INT[])" )
 
 				# Retrieve table OIDs per empty result set.
 				res = conn.exec( "SELECT * FROM copytable LIMIT 0" )
 				tm = basic_type_mapping.build_column_map( res )
-				row_encoder = YugabyteYSQL::TextEncoder::CopyRow.new type_map: tm
+				row_encoder = YSQL::TextEncoder::CopyRow.new type_map: tm
 
 				conn.copy_data( "COPY copytable FROM STDIN", row_encoder ) do |res|
 					conn.put_copy_data ['b', 234, [2,3]]
@@ -107,7 +107,7 @@ describe 'Basic type mapping' do
 				# Retrieve table OIDs per empty result set.
 				res = @conn.exec( "SELECT * FROM copytable LIMIT 0" )
 				tm = basic_type_mapping.build_column_map( res )
-				row_encoder = YugabyteYSQL::TextEncoder::CopyRow.new type_map: tm
+				row_encoder = YSQL::TextEncoder::CopyRow.new type_map: tm
 
 				@conn.copy_data( "COPY copytable FROM STDIN", row_encoder ) do |res|
 					@conn.put_copy_data ['a', 123, [5,4,3]]
@@ -124,7 +124,7 @@ describe 'Basic type mapping' do
 					# Retrieve table OIDs per empty result set.
 					res = @conn.exec_params( "SELECT * FROM copytable LIMIT 0", [], format )
 					tm = basic_type_mapping.build_column_map( res )
-					nsp = format==1 ? YugabyteYSQL::BinaryEncoder : YugabyteYSQL::TextEncoder
+					nsp = format==1 ? YSQL::BinaryEncoder : YSQL::TextEncoder
 					row_encoder = nsp::CopyRow.new type_map: tm
 
 					@conn.copy_data( "COPY copytable FROM STDIN WITH (FORMAT #{ format==1 ? "binary" : "text" })", row_encoder ) do |res|

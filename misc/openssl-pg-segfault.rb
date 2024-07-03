@@ -8,7 +8,7 @@ SOCKHOST = 'it-trac.laika.com'
 # Load pg first, so the libssl.so that libpq is linked against is loaded.
 require 'ysql'
 $stderr.puts "connecting to postgres://#{PGHOST}/#{PGDB}"
-conn = YugabyteYSQL.connect(PGHOST, :dbname => PGDB )
+conn = YSQL.connect(PGHOST, :dbname => PGDB )
 
 # Now load OpenSSL, which might be linked against a different libssl.
 require 'socket'

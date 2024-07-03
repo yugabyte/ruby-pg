@@ -27,7 +27,7 @@ class Stats
 
 	def initialize( opts )
 		@opts = opts
-		@db   = YugabyteYSQL.connect(
+		@db   = YSQL.connect(
 			:dbname   => opts.database,
 			:host     => opts.host,
 			:port     => opts.port,

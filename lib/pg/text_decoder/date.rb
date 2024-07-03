@@ -3,7 +3,7 @@
 
 require 'date'
 
-module YugabyteYSQL
+module YSQL
 	module TextDecoder
 		class Date < SimpleDecoder
 			def decode(string, tuple=nil, field=nil)

@@ -10,12 +10,12 @@ require 'ysql'
 def check_connection( conn )
 	begin
 		conn.exec( "SELECT 1" )
-	rescue YugabyteYSQL::Error => err
+	rescue YSQL::Error => err
 		$stderr.puts "%p while testing connection: %s" % [ err.class, err.message ]
 		conn.reset
 	end
 end
 
-conn = YugabyteYSQL.connect(dbname: 'test' )
+conn = YSQL.connect(dbname: 'test' )
 check_connection( conn )
 
