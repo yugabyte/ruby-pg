@@ -19,7 +19,7 @@ jobs:
           ruby-version: "3.2"
 
       - name: Build source gem
-        run: gem build yugabyte_ysql.gemspec
+        run: gem build yugabytedb-ysql.gemspec
 
       - name: Upload source gem
         uses: actions/upload-artifact@v3

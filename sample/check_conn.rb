@@ -2,7 +2,7 @@
 # vim: set nosta noet ts=4 sw=4:
 # encoding: utf-8
 
-require 'yugabyte_ysql'
+require 'ysql'
 
 # This is a minimal example of a function that can test an existing PG::Connection and
 # reset it if necessary.

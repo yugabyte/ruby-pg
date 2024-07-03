@@ -1,6 +1,6 @@
 # -*- ruby -*-
 
-require 'yugabyte_ysql'
+require 'ysql'
 
 # This is a example of how to use the asynchronous API to query the
 # server without blocking other threads. It's intentionally low-level;

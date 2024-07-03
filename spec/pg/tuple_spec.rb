@@ -2,7 +2,7 @@
 # encoding: utf-8
 
 require_relative '../helpers'
-require 'yugabyte_ysql'
+require 'ysql'
 
 describe YugabyteYSQL::Tuple do
 	let!(:typemap) { YugabyteYSQL::BasicTypeMapForResults.new(@conn).freeze }

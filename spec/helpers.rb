@@ -3,7 +3,7 @@
 require 'pathname'
 require 'rspec'
 require 'shellwords'
-require 'yugabyte_ysql'
+require 'ysql'
 require 'openssl'
 require 'objspace'
 require_relative 'helpers/scheduler.rb'

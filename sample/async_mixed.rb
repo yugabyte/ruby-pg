@@ -1,6 +1,6 @@
 # -*- ruby -*-
 
-require 'yugabyte_ysql'
+require 'ysql'
 
 $stdout.sync = true
 

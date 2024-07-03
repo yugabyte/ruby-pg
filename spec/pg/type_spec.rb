@@ -1,7 +1,7 @@
 # -*- rspec -*-
 # encoding: utf-8
 
-require 'yugabyte_ysql'
+require 'ysql'
 require 'time'
 
 

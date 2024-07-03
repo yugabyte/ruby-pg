@@ -19,7 +19,7 @@ require 'ostruct'
 require 'optparse'
 require 'pathname'
 require 'etc'
-require 'yugabyte_ysql'
+require 'ysql'
 require 'pp'
 
 

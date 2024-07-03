@@ -1,6 +1,6 @@
 # -*- ruby -*-
 
-require 'yugabyte_ysql'
+require 'ysql'
 
 # An example of how to use SQL cursors. This is mostly a straight port of
 # the cursor portion of testlibpq.c from src/test/examples.

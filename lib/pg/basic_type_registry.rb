@@ -1,7 +1,7 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-require 'yugabyte_ysql' unless defined?( YugabyteYSQL )
+require 'ysql' unless defined?( YugabyteYSQL )
 
 # This class defines the mapping between PostgreSQL types and encoder/decoder classes for PG::BasicTypeMapForResults, PG::BasicTypeMapForQueries and PG::BasicTypeMapBasedOnResult.
 #

@@ -1,6 +1,6 @@
 # -*- ruby -*-
 
-require 'yugabyte_ysql'
+require 'ysql'
 
 conn = YugabyteYSQL.connect(:dbname => 'test' )
 $stderr.puts '---',

@@ -1,6 +1,6 @@
 # -*- ruby -*-
 
-require 'yugabyte_ysql'
+require 'ysql'
 require 'stringio'
 
 $stderr.puts "Opening database connection ..."

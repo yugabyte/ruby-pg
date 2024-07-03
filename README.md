@@ -1,4 +1,4 @@
-# yugabyte_ysql
+# ysql
 
 This is a fork of [Ruby interface to the PostgreSQL RDBMS](https://github.com/ged/ruby-pg) to develop a Ruby interface to YugabyteDB.
 
@@ -27,7 +27,7 @@ Please refer to the [Use the Driver](#Use the Driver) section for examples.
 ## Install the Driver
 
 ```shell
-gem install yugabyte_ysql -- --with-pg-config=<yugabyte-install-dir>/postgres/bin/pg_config
+gem install yugabytedb-ysql -- --with-pg-config=<yugabyte-install-dir>/postgres/bin/pg_config
 ```
 
 ## Use the Driver
@@ -36,7 +36,7 @@ gem install yugabyte_ysql -- --with-pg-config=<yugabyte-install-dir>/postgres/bi
 
   For uniform load balancing across all the server you just need to specify the _load_balance=true_ property in the url.
     ```
-    require 'yugabyte_ysql'
+    require 'ysql'
     ...
     yburl = "postgresql://yugabyte:yugabyte@127.0.0.1:5433/yugabyte?load_balance=true"
     connection = YugabyteYSQL.connect(url)
@@ -46,7 +46,7 @@ gem install yugabyte_ysql -- --with-pg-config=<yugabyte-install-dir>/postgres/bi
   For specifying topology keys you need to set the additional property with a valid comma separated value.
 
     ```
-    require 'yugabyte_ysql'
+    require 'ysql'
     ...
     yburl = "postgresql://yugabyte:yugabyte@127.0.0.1:5433/yugabyte?load_balance=true&topology_keys=cloud.regionA.zoneA,cloud.regionA.zoneB"
     connection = YugabyteYSQL.connect(url)

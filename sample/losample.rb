@@ -1,6 +1,6 @@
 # -*- ruby -*-
 
-require 'yugabyte_ysql'
+require 'ysql'
 
 SAMPLE_WRITE_DATA = 'some sample data'
 SAMPLE_EXPORT_NAME = 'lowrite.txt'

@@ -4,7 +4,7 @@
 require_relative '../helpers'
 
 require 'socket'
-require 'yugabyte_ysql'
+require 'ysql'
 
 describe YugabyteYSQL::Connection do
 

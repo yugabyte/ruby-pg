@@ -13,7 +13,7 @@
 require 'ostruct'
 require 'optparse'
 require 'etc'
-require 'yugabyte_ysql'
+require 'ysql'
 
 SCRIPT_VERSION = %q$Id$
 

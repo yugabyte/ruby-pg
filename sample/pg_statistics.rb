@@ -16,7 +16,7 @@
 require 'ostruct'
 require 'optparse'
 require 'etc'
-require 'yugabyte_ysql'
+require 'ysql'
 
 
 ### PostgreSQL Stats.  Fetch information from pg_stat_* tables.

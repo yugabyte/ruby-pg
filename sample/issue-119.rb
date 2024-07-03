@@ -1,6 +1,6 @@
 # -*- ruby -*-
 
-require 'yugabyte_ysql'
+require 'ysql'
 
 # This is another example of how to use COPY FROM, this time as a
 # minimal test case used to try to figure out what was going on in

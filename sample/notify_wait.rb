@@ -10,7 +10,7 @@ BEGIN {
         $LOAD_PATH.unshift( libdir.to_s ) unless $LOAD_PATH.include?( libdir.to_s )
 }
 
-require 'yugabyte_ysql'
+require 'ysql'
 
 TRIGGER_TABLE = %{
 	CREATE TABLE IF NOT EXISTS test ( message text );

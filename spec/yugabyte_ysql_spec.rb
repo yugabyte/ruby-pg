@@ -3,7 +3,7 @@
 
 require_relative 'helpers'
 
-require 'yugabyte_ysql'
+require 'ysql'
 
 describe YugabyteYSQL do
 

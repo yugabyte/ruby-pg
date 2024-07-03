@@ -1,7 +1,7 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-require 'yugabyte_ysql' unless defined?( YugabyteYSQL )
+require 'ysql' unless defined?( YugabyteYSQL )
 
 
 class YugabyteYSQL::Result

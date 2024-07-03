@@ -1,7 +1,7 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-require 'yugabyte_ysql' unless defined?( YugabyteYSQL )
+require 'ysql' unless defined?( YugabyteYSQL )
 
 # Simple set of rules for type casting common Ruby types to PostgreSQL.
 #

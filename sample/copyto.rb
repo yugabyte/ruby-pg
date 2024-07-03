@@ -1,6 +1,6 @@
 # -*- ruby -*-
 
-require 'yugabyte_ysql'
+require 'ysql'
 require 'stringio'
 
 # An example of how to stream data to your local host from the database as CSV.

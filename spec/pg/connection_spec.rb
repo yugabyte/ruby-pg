@@ -5,7 +5,7 @@ require_relative '../helpers'
 
 require 'timeout'
 require 'socket'
-require 'yugabyte_ysql'
+require 'ysql'
 
 # Work around ruby bug: https://bugs.ruby-lang.org/issues/19562
 ''.encode(Encoding::ISO8859_2)

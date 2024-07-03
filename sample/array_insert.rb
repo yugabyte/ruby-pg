@@ -1,6 +1,6 @@
 # -*- ruby -*-
 
-require 'yugabyte_ysql'
+require 'ysql'
 
 c = YugabyteYSQL.connect(dbname: 'test' )
 

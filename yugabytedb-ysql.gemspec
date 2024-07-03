@@ -4,7 +4,7 @@
 require_relative 'lib/pg/version'
 
 Gem::Specification.new do |spec|
-  spec.name          = "yugabyte_ysql"
+  spec.name          = "yugabytedb-ysql"
   spec.version       = YugabyteYSQL::VERSION
   spec.authors       = ["Michael Granger", "Lars Kanis", "YugabyteDB Dev Team"]
   spec.email         = ["ged@FaerieMUD.org", "lars@greiz-reinsdorf.de", "info@yugabyte.com"]

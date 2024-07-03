@@ -6,7 +6,7 @@ PGDB     = 'test'
 SOCKHOST = 'it-trac.laika.com'
 
 # Load pg first, so the libssl.so that libpq is linked against is loaded.
-require 'yugabyte_ysql'
+require 'ysql'
 $stderr.puts "connecting to postgres://#{PGHOST}/#{PGDB}"
 conn = YugabyteYSQL.connect(PGHOST, :dbname => PGDB )
 

@@ -1,7 +1,7 @@
 # -*- ruby -*-
 # frozen_string_literal: true
 
-require 'yugabyte_ysql' unless defined?( YugabyteYSQL )
+require 'ysql' unless defined?( YugabyteYSQL )
 require 'io/wait' unless ::IO.public_instance_methods(false).include?(:wait_readable)
 require 'socket'
 require_relative 'load_balance_service'
