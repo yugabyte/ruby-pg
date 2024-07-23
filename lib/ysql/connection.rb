@@ -305,9 +305,9 @@ class YSQL::Connection
 	end
 
 	# Backward-compatibility aliases for stuff that's moved into PG.
-	class << self
-		define_method( :isthreadsafe, &YSQL.method(:isthreadsafe) )
-	end
+	# class << self
+	# 	define_method( :isthreadsafe, &YSQL.method(:isthreadsafe) )
+	# end
 
 	#
 	# call-seq:
@@ -958,9 +958,17 @@ class YSQL::Connection
 		YSQL.make_shareable(REDIRECT_METHODS)
 
 		def async_send_api=(enable)
+                        puts caller
+			puts "self methods: #{self.methods - Object.methods}"
 			REDIRECT_SEND_METHODS.each do |ali, (async, sync)|
-				undef_method(ali) if method_defined?(ali)
+				if method_defined?(ali)
+					puts "undefining method #{ali}"
+					undef_method(ali)
+				else 
+					puts "method not defined #{ali}"
+				end
 				alias_method( ali, enable ? async : sync )
+                                puts "created alias #{ali} for #{async}"
 			end
 		end
 

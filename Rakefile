@@ -22,14 +22,14 @@ TMPDIR  = BASEDIR + 'tmp'
 TESTDIR = BASEDIR + "tmp_test_*"
 
 DLEXT   = RbConfig::CONFIG['DLEXT']
-EXT     = LIBDIR + "pg_ext.#{DLEXT}"
+EXT     = LIBDIR + "ysql_ext.#{DLEXT}"
 
 GEMSPEC = 'yugabytedb-ysql.gemspec'
 
 CLEAN.include( TESTDIR.to_s )
 CLEAN.include( PKGDIR.to_s, TMPDIR.to_s )
 CLEAN.include "lib/*/libpq.dll"
-CLEAN.include "lib/pg_ext.*"
+CLEAN.include "lib/ysql_ext.*"
 CLEAN.include "lib/pg/postgresql_lib_path.rb"
 
 load 'Rakefile.cross'
@@ -44,7 +44,7 @@ end
 
 # Rake-compiler task
 Rake::ExtensionTask.new do |ext|
-	ext.name           = 'pg_ext'
+	ext.name           = 'ysql_ext'
 	ext.gem_spec       = $gem_spec
 	ext.ext_dir        = 'ext'
 	ext.lib_dir        = 'lib'

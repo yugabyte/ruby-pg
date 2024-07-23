@@ -293,7 +293,7 @@ extern VALUE pg_typemap_all_strings;
 /***************************************************************************
  * PROTOTYPES
  **************************************************************************/
-void Init_pg_ext                                       _(( void ));
+void Init_ysql_ext                                     _(( void ));
 
 void init_pg_connection                                _(( void ));
 void init_pg_result                                    _(( void ));
