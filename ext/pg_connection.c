@@ -11,7 +11,6 @@
 
 
 VALUE rb_cPGconn;
-VALUE rb_cPGlbs;
 static ID s_id_encode;
 static ID s_id_autoclose_set;
 static VALUE sym_type, sym_format, sym_value;
@@ -533,9 +532,6 @@ static VALUE
 pgconn_finish( VALUE self )
 {
 	t_pg_connection *this = pg_get_connection_safe( self );
-	char *host = PQhost(this->pgconn);
-	rb_cPGlbs = rb_define_class_under( rb_mPG, "LoadBalanceService", rb_cObject );
-	if (host) rb_funcall(rb_cPGlbs, rb_intern("decrement_connection_count"), 1, rb_str_new2(host));
 
 	pgconn_close_socket_io( self );
 	PQfinish( this->pgconn );
@@ -4502,7 +4498,6 @@ init_pg_connection(void)
 	rb_define_method(rb_cPGconn, "reset_start", pgconn_reset_start, 0);
 	rb_define_private_method(rb_cPGconn, "reset_start2", pgconn_reset_start2, 1);
 	rb_define_method(rb_cPGconn, "reset_poll", pgconn_reset_poll, 0);
-	rb_define_alias(rb_cPGconn, "close", "finish");
 
 	/******     PG::Connection INSTANCE METHODS: Connection Status     ******/
 	rb_define_method(rb_cPGconn, "db", pgconn_db, 0);
