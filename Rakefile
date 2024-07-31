@@ -30,7 +30,7 @@ CLEAN.include( TESTDIR.to_s )
 CLEAN.include( PKGDIR.to_s, TMPDIR.to_s )
 CLEAN.include "lib/*/libpq.dll"
 CLEAN.include "lib/ysql_ext.*"
-CLEAN.include "lib/pg/postgresql_lib_path.rb"
+CLEAN.include "lib/ysql/postgresql_lib_path.rb"
 
 load 'Rakefile.cross'
 

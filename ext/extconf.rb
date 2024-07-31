@@ -12,7 +12,6 @@ if ENV['MAINTAINER_MODE']
 end
 
 if pgdir = with_config( 'ysql' )
-        puts "env(PATH): #{ENV['PATH']}"
 	ENV['PATH'] = "#{pgdir}/bin" + File::PATH_SEPARATOR + ENV['PATH']
 end
 

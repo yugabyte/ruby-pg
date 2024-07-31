@@ -7,17 +7,13 @@ module YSQL
 
 	# Is this file part of a fat binary gem with bundled libpq?
 	bundled_libpq_path = File.join(__dir__, RUBY_PLATFORM.gsub(/^i386-/, "x86-"))
-        puts "bundled_libpq_path: #{bundled_libpq_path}"
 	if File.exist?(bundled_libpq_path)
 		POSTGRESQL_LIB_PATH = bundled_libpq_path
 	else
-                # Initialize this to false to avoid 'uninitialized constant' error when PG Ruby driver is already loaded
-                # POSTGRESQL_LIB_PATH = false
 		bundled_libpq_path = nil
 		# Try to load libpq path as found by extconf.rb
 		begin
 			require "ysql/postgresql_lib_path"
-                        puts "ysql/postgresql_lib_path loaded"
 		rescue LoadError
 			# rake-compiler doesn't use regular "make install", but uses it's own install tasks.
 			# It therefore doesn't copy ysql/postgresql_lib_path.rb in case of "rake compile".
@@ -37,7 +33,6 @@ module YSQL
 				ENV['PATH'] = old_path
 			end
 		else
-                        puts "Calling block.call ..."
 			# No need to set a load path manually - it's set as library rpath.
 			block.call
 		end
@@ -51,9 +46,7 @@ module YSQL
 				raise "Oops, can't extract the major/minor version from #{RUBY_VERSION.dump}"
 			require "#{major_minor}/ysql_ext"
 		else
-                        puts "[YSQL] require 'ysql_ext'"
 			require 'ysql_ext'
-                        puts "[YSQL] after require 'ysql_ext'"
 		end
 	end
 
@@ -117,9 +110,7 @@ module YSQL
 	require 'ysql/exceptions'
 	require 'ysql/coder'
 	require 'ysql/type_map_by_column'
-        puts "[YSQL] calling require 'ysql/connection'"
 	require 'ysql/connection'
-        puts "[YSQL] after require 'ysql/connection'"
 	require 'ysql/result'
 	require 'ysql/tuple'
 	require 'ysql/load_balance_service'
