@@ -11,7 +11,7 @@ if ENV['MAINTAINER_MODE']
 		' -pedantic'
 end
 
-if pgdir = with_config( 'pg' )
+if pgdir = with_config( 'ysql' )
 	ENV['PATH'] = "#{pgdir}/bin" + File::PATH_SEPARATOR + ENV['PATH']
 end
 
@@ -26,7 +26,7 @@ if enable_config("windows-cross")
 	# Avoid dependency to external libgcc.dll on x86-mingw32
 	$LDFLAGS << " -static-libgcc"
 	# Don't use pg_config for cross build, but --with-pg-* path options
-	dir_config 'pg'
+	dir_config 'ysql'
 
 else
 	# Native build
@@ -39,7 +39,7 @@ else
 		$stderr.puts "Using config values from %s" % [ pgconfig ]
 		incdir = IO.popen([pgconfig, "--includedir"], &:read).chomp
 		libdir = IO.popen([pgconfig, "--libdir"], &:read).chomp
-		dir_config 'pg', incdir, libdir
+		dir_config 'ysql', incdir, libdir
 
 		# Windows traditionally stores DLLs beside executables, not in libdir
 		dlldir = RUBY_PLATFORM=~/mingw|mswin/ ? IO.popen([pgconfig, "--bindir"], &:read).chomp : libdir
@@ -50,7 +50,7 @@ else
 		end
 
 	else
-		incdir, libdir = dir_config 'pg'
+		incdir, libdir = dir_config 'ysql'
 		dlldir = libdir
 	end
 
@@ -74,7 +74,7 @@ module YSQL
 end
 EOT
 $INSTALLFILES = {
-	"./postgresql_lib_path.rb" => "$(RUBYLIBDIR)/pg/"
+	"./postgresql_lib_path.rb" => "$(RUBYLIBDIR)/ysql/"
 }
 
 if RUBY_VERSION >= '2.3.0' && /solaris/ =~ RUBY_PLATFORM
@@ -170,5 +170,5 @@ checking_for "C99 variable length arrays" do
 end
 
 create_header()
-create_makefile( "pg_ext" )
+create_makefile( "ysql_ext" )
 

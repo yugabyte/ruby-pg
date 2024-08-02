@@ -332,7 +332,7 @@ pg_s_init_ssl(VALUE self, VALUE do_ssl)
  **************************************************************************/
 
 void
-Init_pg_ext(void)
+Init_ysql_ext(void)
 {
 
 #ifdef HAVE_RB_EXT_RACTOR_SAFE

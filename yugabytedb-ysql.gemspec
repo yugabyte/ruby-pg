@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 # -*- encoding: utf-8 -*-
 
-require_relative 'lib/pg/version'
+require_relative 'lib/ysql/version'
 
 Gem::Specification.new do |spec|
   spec.name          = "yugabytedb-ysql"

@@ -259,7 +259,6 @@ extern VALUE rb_eInvalidChangeOfResultFields;
 extern VALUE rb_mPGconstants;
 extern VALUE rb_cPGconn;
 extern VALUE rb_cPGresult;
-extern VALUE rb_cPGlbs;
 extern VALUE rb_hErrors;
 extern VALUE rb_cTypeMap;
 extern VALUE rb_cTypeMapAllStrings;
@@ -293,7 +292,7 @@ extern VALUE pg_typemap_all_strings;
 /***************************************************************************
  * PROTOTYPES
  **************************************************************************/
-void Init_pg_ext                                       _(( void ));
+void Init_ysql_ext                                     _(( void ));
 
 void init_pg_connection                                _(( void ));
 void init_pg_result                                    _(( void ));
