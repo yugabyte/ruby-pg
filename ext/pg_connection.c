@@ -2453,6 +2453,15 @@ wait_socket_readable( VALUE self, struct timeval *ptimeout, void *(*is_readable)
 			pgconn_close_socket_io(self);
 			pg_raise_conn_error(rb_eConnectionBad, self, "PQconsumeInput() %s", PQerrorMessage(conn));
 		}
+
+		if (PQsslInUse(conn)) {
+			for (int i = 0; i < 15; i++) {
+				if ( PQconsumeInput(conn) == 0 ) {
+					pgconn_close_socket_io(self);
+					pg_raise_conn_error(rb_eConnectionBad, self, "PQconsumeInput() %s", PQerrorMessage(conn));
+				}
+			}
+		}
 	}
 
 	return retval;
