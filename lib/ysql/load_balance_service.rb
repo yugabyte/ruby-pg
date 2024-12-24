@@ -256,12 +256,12 @@ class YSQL::LoadBalanceService
     end
 
     if allowed_placements.nil? || (selected.empty? && !fallback_to_tk_only) # cluster-aware || fallback_to_tk_only = false
-      unless allowed_placements.nil?
-      end
+      # unless allowed_placements.nil?
+      # end
       min_connections = 1000000 # Using some really high value
       selected = Array.new
       @@cluster_info.each do |host, node_info|
-        unless node_info.is_down
+        if !node_info.is_down && is_node_type_acceptable(node_info.node_type, lb_value, strict_preference)
           if node_info.count < min_connections
             min_connections = node_info.count
             selected.clear
@@ -279,10 +279,11 @@ class YSQL::LoadBalanceService
       index = rand(selected.size)
       selected_node = selected[index]
       @@cluster_info[selected_node].count += 1
+      selected_port = @@cluster_info[selected_node].port
       if !@@useHostColumn.nil? && !@@useHostColumn
         selected_node = @@cluster_info[selected_node].public_ip
       end
-      Array[selected_node, @@cluster_info[selected_node].port, current_index]
+      Array[selected_node, selected_port, current_index]
     end
   end
 
