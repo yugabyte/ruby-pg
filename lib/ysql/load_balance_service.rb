@@ -92,17 +92,33 @@ class YSQL::LoadBalanceService
     until success
       @@mutex.acquire_write_lock
       begin
-        host_port = get_least_loaded_server(lb_props.placements_info, lb_props.fallback_to_tk_only, new_request, placement_index, lb_props.lb_value, strict_preference)
+        if strict_preference
+          host_port = get_least_loaded_server(lb_props.placements_info, lb_props.fallback_to_tk_only, new_request, placement_index, lb_props.lb_value, strict_preference)
+        else
+          host_port = get_least_loaded_server(nil, lb_props.fallback_to_tk_only, new_request, placement_index, lb_props.lb_value, strict_preference)
+        end
         new_request = false
       ensure
         @@mutex.release_write_lock
       end
       unless host_port
-        if strict_preference && (lb_props.lb_value == "prefer-primary" || lb_props.lb_value == "prefer-rr")
-          strict_preference = false
-          placement_index = 1
-          puts "connect_to_lb_hosts(): lb_host not found, retrying without strict preference"
-          next
+        if (lb_props.lb_value == "only-primary" || lb_props.lb_value == "only-rr" )
+          puts "connect_to_lb_hosts(): lb_host not found for only-*, throwing failure"
+          raise(YSQL::Error, "No node found for load_balance=#{lb_props.lb_value}")
+        elsif strict_preference && (lb_props.lb_value == "prefer-primary" || lb_props.lb_value == "prefer-rr")
+          @@mutex.acquire_write_lock
+          begin
+            puts "connect_to_lb_hosts(): lb_host not found for #{lb_props.lb_value}, trying without the placement info"
+            host_port = get_least_loaded_server(nil, lb_props.fallback_to_tk_only, new_request, placement_index, lb_props.lb_value, strict_preference)
+          ensure
+            @@mutex.release_write_lock
+          end
+          unless host_port
+            strict_preference = false
+            placement_index = 1
+            puts "connect_to_lb_hosts(): lb_host not found, retrying without strict preference"
+            next
+          end
         else
           puts "connect_to_lb_hosts(): lb_host not found"
           break
