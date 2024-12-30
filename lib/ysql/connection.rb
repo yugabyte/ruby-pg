@@ -848,7 +848,6 @@ class YSQL::Connection
 		end
 
 		private def connect_to_hosts(*args)
-			puts "connect_to_hosts(): args = #{args}"
 			option_string, lb_properties = parse_connect_args_and_return_lb_props(*args)
 			iopts = YSQL::Connection.conninfo_parse(option_string).each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }
 			iopts = YSQL::Connection.conndefaults.each_with_object({}){|h, o| o[h[:keyword].to_sym] = h[:val] if h[:val] }.merge(iopts)
