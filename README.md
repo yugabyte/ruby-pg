@@ -89,9 +89,9 @@ The driver attempts connection to servers in the first fallback placement(s) if 
 then it attempts to connect to servers in the second fallback placement(s), if specified. This continues until the driver finds a server to connect to, else an error is returned to the application.
 And this repeats for each connection request.
 
-### Limitations
+### Using with ActiveRecord
 
-- The load balancing feature of the Ruby Smart driver for YugabyteDB does not work with ActiveRecords - the ORM tool for Ruby apps.
+- The load balancing feature of the Ruby Smart driver for YugabyteDB can be used with ActiveRecord - the ORM tool for Ruby apps - via its [adapter for YugabyteDB](https://github.com/yugabyte/activerecord-yugabytedb-adapter).
 
 Rest of the README is from upstream repository.
 
