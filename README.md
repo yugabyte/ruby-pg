@@ -16,7 +16,13 @@ This is similar to 'Cluster Awareness' but uses those servers which are part of 
 
 ### Connection Properties added for load balancing
 
-- _load_balance_   - It expects **true/false** as its possible values. The 'load_balance' property needs to be set to 'true' to enable cluster-awareness.
+- _load_balance_ - Starting with version 0.6, it expects one of **false, any (same as true), only-primary, only-rr, prefer-primary and prefer-rr** as its possible values. The default value for _load_balance_ property is `false`.
+  - _false_ - No connection load balancing. Behaviour is similar to vanilla ruby-pg driver
+  - _any_ - Same as value _true_. Distribute connections equally across all nodes in the cluster, irrespective of its type (`primary` or `read-replica`)
+  - _only-primary_ - Create connections equally across only the primary nodes of the cluster
+  - _only-rr_ - Create connections equally across only the read-replica nodes of the cluster
+  - _prefer-primary_ - Create connections equally across primary cluster nodes. If none available, on any available read replica node in the cluster
+  - _prefer-rr_ - Create connections equally across read replica nodes of the cluster. If none available, on any available primary cluster node
 - _topology_keys_  - It takes a comma separated geo-location values. A single geo-location can be given as 'cloud.region.zone'. Multiple geo-locations too can be specified, separated by comma (`,`). Optionally, you can also register your preference for particular geo-locations by appending the preference value with prefix `:`. For example, `cloud.regionA.zoneA:1,cloud.regionA.zoneB:2`.
 - _yb_servers_refresh_interval_ - Minimum time interval, in seconds, between two attempts to refresh the information about cluster nodes. This is checked only when a new connection is requested. Default is 300. Valid values are integers between 0 and 600. Value 0 means refresh for each connection request. Any value outside this range is ignored and the default is used.
 - _fallback_to_topology_keys_only_ - When set to true, the driver does not attempt to connect to nodes outside of the geo-locations specified via _topology_keys_. Default value is false.
@@ -83,9 +89,9 @@ The driver attempts connection to servers in the first fallback placement(s) if 
 then it attempts to connect to servers in the second fallback placement(s), if specified. This continues until the driver finds a server to connect to, else an error is returned to the application.
 And this repeats for each connection request.
 
-### Limitations
+### Using with ActiveRecord
 
-- The load balancing feature of the Ruby Smart driver for YugabyteDB does not work with ActiveRecords - the ORM tool for Ruby apps.
+- The load balancing feature of the Ruby Smart driver for YugabyteDB can be used with ActiveRecord - the ORM tool for Ruby apps - via its [adapter for YugabyteDB](https://github.com/yugabyte/activerecord-yugabytedb-adapter).
 
 Rest of the README is from upstream repository.
 

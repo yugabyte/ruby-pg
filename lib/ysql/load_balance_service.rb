@@ -4,8 +4,16 @@ require 'concurrent'
 
 class YSQL::LoadBalanceService
 
-  LBProperties = Struct.new(:placements_info, :refresh_interval, :fallback_to_tk_only, :failed_host_reconnect_delay)
-  Node = Struct.new(:host, :port, :cloud, :region, :zone, :public_ip, :count, :is_down, :down_since)
+  class << self
+    attr_accessor :logger
+  end
+
+  # Set up a default logger
+  self.logger = Logger.new(STDOUT)
+  self.logger.level = Logger::WARN
+
+  LBProperties = Struct.new(:lb_value, :placements_info, :refresh_interval, :fallback_to_tk_only, :failed_host_reconnect_delay)
+  Node = Struct.new(:host, :port, :cloud, :region, :zone, :public_ip, :count, :is_down, :down_since, :node_type)
   CloudPlacement = Struct.new(:cloud, :region, :zone)
   @@mutex = Concurrent::ReentrantReadWriteLock.new
   @@last_refresh_time = -1
@@ -27,6 +35,7 @@ class YSQL::LoadBalanceService
       info = @@cluster_info[host]
       unless info.nil?
         info.count -= 1
+        logger.debug "decrement_connection_count(): count for #{host} updated to #{info.count}"
         if info.count < 0
           # Can go negative if we are here because of a connection that was created in a non-LB fashion
           info.count = 0
@@ -40,6 +49,7 @@ class YSQL::LoadBalanceService
   end
 
   def self.connect_to_lb_hosts(lb_props, iopts)
+    logger.debug "connect_to_lb_hosts(): lb_props = #{lb_props}"
     refresh_done = false
     @@mutex.acquire_write_lock
     begin
@@ -48,16 +58,21 @@ class YSQL::LoadBalanceService
           if @@control_connection == nil
             begin
               @@control_connection = create_control_connection(iopts)
+              logger.debug "connect_to_lb_hosts(): created control connection to #{@@control_connection.host}"
             rescue
               return nil
             end
           end
           begin
             refresh_yb_servers(lb_props.failed_host_reconnect_delay, @@control_connection)
+            logger.debug "connect_to_lb_hosts(): refreshed yb_servers metadata"
             refresh_done = true
           rescue => err
             if iopts[:host] == @@control_connection.host
               if @@cluster_info[iopts[:host]]
+                if @@cluster_info[iopts[:host]].is_down
+                  logger.debug "connect_to_lb_hosts(): Marking #{@@control_connection.host} as DOWN"
+                end
                 @@cluster_info[iopts[:host]].is_down = true
                 @@cluster_info[iopts[:host]].down_since = Time.now.to_i
               end
@@ -73,6 +88,7 @@ class YSQL::LoadBalanceService
               end
             end
             @@control_connection = create_control_connection(iopts)
+            logger.debug "connect_to_lb_hosts(): created control connection to #{@@control_connection.host} in rescue"
           end
         end
       end
@@ -81,20 +97,43 @@ class YSQL::LoadBalanceService
     end
     success = false
     new_request = true
+    strict_preference = true
     placement_index = 1
     until success
       @@mutex.acquire_write_lock
       begin
-        host_port = get_least_loaded_server(lb_props.placements_info, lb_props.fallback_to_tk_only, new_request, placement_index)
+        if strict_preference
+          host_port = get_least_loaded_server(lb_props.placements_info, lb_props.fallback_to_tk_only, new_request, placement_index, lb_props.lb_value, strict_preference)
+        else
+          host_port = get_least_loaded_server(nil, lb_props.fallback_to_tk_only, new_request, placement_index, lb_props.lb_value, strict_preference)
+        end
         new_request = false
       ensure
         @@mutex.release_write_lock
       end
       unless host_port
-        break
+        if (lb_props.lb_value == "only-primary" || lb_props.lb_value == "only-rr" )
+          raise(YSQL::Error, "No node found for load_balance=#{lb_props.lb_value}")
+        elsif strict_preference && (lb_props.lb_value == "prefer-primary" || lb_props.lb_value == "prefer-rr")
+          @@mutex.acquire_write_lock
+          begin
+            host_port = get_least_loaded_server(nil, lb_props.fallback_to_tk_only, new_request, placement_index, lb_props.lb_value, strict_preference)
+          ensure
+            @@mutex.release_write_lock
+          end
+          unless host_port
+            strict_preference = false
+            placement_index = 1
+            next
+          end
+        else
+          logger.debug "connect_to_lb_hosts(): lb_host not found for load_balance=#{lb_props.lb_value}"
+          break
+        end
       end
       lb_host = host_port[0]
       lb_port = host_port[1]
+      logger.debug "connect_to_lb_hosts(): lb_host #{lb_host}"
       placement_index = host_port[2]
       if lb_host.empty?
         break
@@ -109,6 +148,9 @@ class YSQL::LoadBalanceService
       rescue => e
         @@mutex.acquire_write_lock
         begin
+          if @@cluster_info[lb_host].is_down
+            logger.debug "connect_to_lb_hosts(): Marking #{lb_host} as DOWN"
+          end
           @@cluster_info[lb_host].is_down = true
           @@cluster_info[lb_host].down_since = Time.now.to_i
           @@cluster_info[lb_host].count -= 1
@@ -133,6 +175,9 @@ class YSQL::LoadBalanceService
         success = true
       rescue => e
         if @@cluster_info[iopts[:host]]
+          if @@cluster_info[iopts[:host]].is_down
+            logger.debug "create_control_connection(): Marking #{iopts[:host]} as DOWN"
+          end
           @@cluster_info[iopts[:host]].is_down = true
           @@cluster_info[iopts[:host]].down_since = Time.now.to_i
         end
@@ -161,6 +206,7 @@ class YSQL::LoadBalanceService
       region = row['region']
       zone = row['zone']
       public_ip = row['public_ip']
+      node_type = row['node_type']
       public_ip = resolve_host(public_ip)[0][0] if public_ip
       if not public_ip.nil? and not public_ip.empty?
         found_public_ip = true
@@ -179,12 +225,15 @@ class YSQL::LoadBalanceService
       if old
         if old.is_down
           if Time.now.to_i - old.down_since > failed_host_reconnect_delay_secs
+            unless old.is_down
+              logger.debug "refresh_yb_servers(): Marking #{host} as UP"
+            end
             old.is_down = false
           end
           @@cluster_info[host] = old
         end
       else
-        node = Node.new(host, port, cloud, region, zone, public_ip, 0, false, 0)
+        node = Node.new(host, port, cloud, region, zone, public_ip, 0, false, 0, node_type)
         @@cluster_info[host] = node
       end
     end
@@ -196,21 +245,37 @@ class YSQL::LoadBalanceService
     @@last_refresh_time = Time.now.to_i
   end
 
-  def self.get_least_loaded_server(allowed_placements, fallback_to_tk_only, new_request, placement_index)
+  def self.is_node_type_acceptable(node_type, lb_value, strict_preference)
+    case lb_value
+    when "true", "any"
+      true
+    when "only-primary"
+      node_type == "primary"
+    when "only-rr"
+      node_type == "read_replica"
+    when "prefer-primary"
+      node_type == "primary" || (!strict_preference && node_type == "read_replica")
+    when "prefer-rr"
+      node_type == "read_replica" || (!strict_preference && node_type == "primary")
+    else
+      false
+    end
+  end
+
+  def self.get_least_loaded_server(allowed_placements, fallback_to_tk_only, new_request, placement_index, lb_value, strict_preference)
     current_index = 1
     selected = Array.new
     unless allowed_placements.nil? # topology-aware
-      eligible_hosts = Array.new
+      logger.debug "get_least_loaded_server(): topology_keys given = #{allowed_placements}"
       (placement_index..10).each { |idx|
         current_index = idx
         selected.clear
         min_connections = 1000000 # Using some really high value
         @@cluster_info.each do |host, node_info|
-          unless node_info.is_down
-            unless allowed_placements[idx].nil?
+          if !node_info.is_down && !allowed_placements[idx].nil?
+            if is_node_type_acceptable(node_info.node_type, lb_value, strict_preference)
               allowed_placements[idx].each do |cp|
                 if cp[0] == node_info.cloud && cp[1] == node_info.region && (cp[2] == node_info.zone || cp[2] == "*")
-                  eligible_hosts << host
                   if node_info.count < min_connections
                     min_connections = node_info.count
                     selected.clear
@@ -231,12 +296,11 @@ class YSQL::LoadBalanceService
     end
 
     if allowed_placements.nil? || (selected.empty? && !fallback_to_tk_only) # cluster-aware || fallback_to_tk_only = false
-      unless allowed_placements.nil?
-      end
+      logger.debug "get_least_loaded_server(): topology_keys not given or no nodes found for given topology_keys"
       min_connections = 1000000 # Using some really high value
       selected = Array.new
       @@cluster_info.each do |host, node_info|
-        unless node_info.is_down
+        if !node_info.is_down && is_node_type_acceptable(node_info.node_type, lb_value, strict_preference)
           if node_info.count < min_connections
             min_connections = node_info.count
             selected.clear
@@ -254,14 +318,16 @@ class YSQL::LoadBalanceService
       index = rand(selected.size)
       selected_node = selected[index]
       @@cluster_info[selected_node].count += 1
+      selected_port = @@cluster_info[selected_node].port
       if !@@useHostColumn.nil? && !@@useHostColumn
         selected_node = @@cluster_info[selected_node].public_ip
       end
-      Array[selected_node, @@cluster_info[selected_node].port, current_index]
+      Array[selected_node, selected_port, current_index]
     end
   end
 
   def self.parse_lb_args_from_url(conn_string)
+    logger.debug "parse_lb_args_from_url(): conn_string = #{conn_string}"
     string_parts = conn_string.split('?', -1)
     if string_parts.length != 2
       return conn_string, nil
@@ -293,7 +359,7 @@ class YSQL::LoadBalanceService
 
       base_string = base_string.chop if base_string[-1] == "&"
       base_string = base_string.chop if base_string[-1] == "?"
-      if not lb_props.empty? and lb_props[:load_balance].to_s.downcase == "true"
+      if not lb_props.empty? and is_lb_enabled(lb_props[:load_balance].to_s.downcase)
         return base_string, parse_connect_lb_args(lb_props)
       else
         return base_string, nil
@@ -301,15 +367,25 @@ class YSQL::LoadBalanceService
     end
   end
 
+  def self.is_lb_enabled(lb)
+    case lb
+    when "true", "any", "only-primary", "prefer-primary", "only-rr", "prefer-rr"
+      true
+    else
+      false
+    end
+end
+
   def self.parse_connect_lb_args(hash_arg)
+    logger.debug "parse_connect_lb_args(): hash_arg = #{hash_arg}"
     lb = hash_arg.delete(:load_balance)
     tk = hash_arg.delete(:topology_keys)
     ri = hash_arg.delete(:yb_servers_refresh_interval)
     ttl = hash_arg.delete(:failed_host_reconnect_delay_secs)
     fb = hash_arg.delete(:fallback_to_topology_keys_only)
 
-    if lb && lb.to_s.downcase == "true"
-      lb_properties = LBProperties.new(nil, 300, false, 5)
+    if is_lb_enabled(lb.to_s.downcase)
+      lb_properties = LBProperties.new(lb.to_s.downcase, nil, 300, false, 5)
       if tk
         lb_properties.placements_info = Hash.new
         tk_parts = tk.split(',', -1)
