@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 require 'ysql' unless defined?( YSQL )
 require 'concurrent'
+require 'logger'
 
 class YSQL::LoadBalanceService
 

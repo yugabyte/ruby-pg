@@ -12,6 +12,7 @@ group :development, :test do
   gem "rdoc", "~> 6.4"
   gem "rspec", "~> 3.5"
   gem 'concurrent-ruby', require: 'concurrent'
+  gem 'logger'
   # "bigdecimal" is a gem on ruby-3.4+ and it's optional for ruby-pg.
   # Specs should succeed without it, but 4 examples are then excluded.
   # gem "bigdecimal", "~> 3.0"
